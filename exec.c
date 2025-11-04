@@ -20,8 +20,9 @@ void execute_command(char *command)
 
     if (pid == 0)
     {
-        /* Child process */
-        char *args[] = {command, NULL};
+        char *args[2];
+        args[0] = command;
+        args[1] = NULL;
         
         if (execve(command, args, NULL) == -1)
         {
@@ -31,7 +32,6 @@ void execute_command(char *command)
     }
     else
     {
-        /* Parent process */
         wait(&status);
     }
 }

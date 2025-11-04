@@ -21,25 +21,23 @@ int main(void)
         printf("#cisfun$ ");
         fflush(stdout);
 
-        /* Use fgets instead of getline */
         if (fgets(command, sizeof(command), stdin) == NULL)
         {
             printf("\n");
             break;
         }
 
-        /* Remove newline */
         command[strcspn(command, "\n")] = '\0';
 
-        /* Skip empty commands */
         if (strlen(command) == 0)
             continue;
 
         pid = fork();
         if (pid == 0)
         {
-            /* Child process */
-            char *args[] = {command, NULL};
+            char *args[2];
+            args[0] = command;
+            args[1] = NULL;
             
             if (execve(command, args, NULL) == -1)
             {
