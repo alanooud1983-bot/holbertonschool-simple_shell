@@ -18,23 +18,32 @@ int main(void)
 
     while (1)
     {
-        printf("#cisfun$ ");
+        /* Display prompt only if we're in the interactive mode */
+        if (isatty(STDIN_FILENO))
+            printf("#cisfun$ ");
+        
         fflush(stdout);
 
+        /* Read command */
         if (fgets(command, sizeof(command), stdin) == NULL)
         {
-            printf("\n");
+            if (isatty(STDIN_FILENO))
+                printf("\n");
             break;
         }
 
+        /* Remove newline */
         command[strcspn(command, "\n")] = '\0';
 
+        /* Skip empty commands */
         if (strlen(command) == 0)
             continue;
 
+        /* Fork and execute */
         pid = fork();
         if (pid == 0)
         {
+            /* Child process */
             char *args[2];
             args[0] = command;
             args[1] = NULL;
@@ -47,7 +56,12 @@ int main(void)
         }
         else if (pid > 0)
         {
+            /* Parent process - wait for child to finish */
             wait(&status);
+            
+            /* Display prompt again only in interactive mode */
+            if (isatty(STDIN_FILENO))
+                printf("#cisfun$ ");
         }
         else
         {
