@@ -5,6 +5,7 @@
 #include <sys/wait.h>
 
 #define MAX_COMMAND_LENGTH 100
+#define BUFFER_SIZE 1024
 
 /**
  * main - Simple Shell 0.1
@@ -15,25 +16,36 @@ int main(void)
     char command[MAX_COMMAND_LENGTH];
     pid_t pid;
     int status;
+    ssize_t bytes_read;
 
     while (1)
     {
-        /* Display prompt only if we're in the interactive mode */
+        /* Display prompt */
         if (isatty(STDIN_FILENO))
             printf("#cisfun$ ");
-        
         fflush(stdout);
 
-        /* Read command */
-        if (fgets(command, sizeof(command), stdin) == NULL)
+        /* Read command using read() instead of fgets() */
+        bytes_read = read(STDIN_FILENO, command, MAX_COMMAND_LENGTH - 1);
+        
+        if (bytes_read == -1)
+        {
+            perror("read");
+            break;
+        }
+        else if (bytes_read == 0)  /* EOF - Ctrl+D */
         {
             if (isatty(STDIN_FILENO))
                 printf("\n");
             break;
         }
 
-        /* Remove newline */
-        command[strcspn(command, "\n")] = '\0';
+        /* Null terminate the string */
+        command[bytes_read] = '\0';
+
+        /* Remove newline character */
+        if (bytes_read > 0 && command[bytes_read - 1] == '\n')
+            command[bytes_read - 1] = '\0';
 
         /* Skip empty commands */
         if (strlen(command) == 0)
@@ -56,12 +68,8 @@ int main(void)
         }
         else if (pid > 0)
         {
-            /* Parent process - wait for child to finish */
+            /* Parent process - wait for child */
             wait(&status);
-            
-            /* Display prompt again only in interactive mode */
-            if (isatty(STDIN_FILENO))
-                printf("#cisfun$ ");
         }
         else
         {
