@@ -4,29 +4,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
-#define BUFFER_SIZE 1024
-
-/**
- * _getline - Simple getline implementation
- * @line: Buffer to store the line
- * @n: Size of buffer
- * @stream: File stream
- * Return: Number of characters read
- */
-ssize_t _getline(char *line, size_t n, FILE *stream)
-{
-    int c;
-    size_t i = 0;
-
-    while (i < n - 1 && (c = getc(stream)) != EOF)
-    {
-        line[i++] = c;
-        if (c == '\n')
-            break;
-    }
-    line[i] = '\0';
-    return (i > 0 ? (ssize_t)i : -1);
-}
+#define MAX_COMMAND_LENGTH 100
 
 /**
  * main - Simple Shell 0.1
@@ -34,51 +12,88 @@ ssize_t _getline(char *line, size_t n, FILE *stream)
  */
 int main(void)
 {
-    char line[BUFFER_SIZE];
-    char *args[2];
+    char command[MAX_COMMAND_LENGTH];
     pid_t pid;
     int status;
-    ssize_t read;
+    ssize_t bytes_read;
     int interactive = 1;
+    int i;
 
     while (1)
     {
+        /* Display prompt */
         if (interactive)
             printf("#cisfun$ ");
         fflush(stdout);
 
-        read = _getline(line, BUFFER_SIZE, stdin);
+        /* Read command */
+        bytes_read = read(0, command, MAX_COMMAND_LENGTH - 1);
         
-        if (read == -1)
+        /* Handle Ctrl+D */
+        if (bytes_read == 0)
+        {
+            if (interactive)
+                printf("\n");
             break;
+        }
+        
+        if (bytes_read == -1)
+        {
+            perror("read");
+            break;
+        }
 
+        /* Null terminate */
+        command[bytes_read] = '\0';
+        
         /* Remove newline */
-        if (read > 0 && line[read - 1] == '\n')
-            line[read - 1] = '\0';
+        if (command[bytes_read - 1] == '\n')
+            command[bytes_read - 1] = '\0';
 
-        /* Skip empty lines */
-        if (strlen(line) == 0)
+        /* Skip empty commands */
+        if (strlen(command) == 0)
             continue;
 
-        args[0] = line;
-        args[1] = NULL;
+        /* Remove leading spaces */
+        i = 0;
+        while (command[i] == ' ')
+            i++;
+        
+        if (i > 0)
+            memmove(command, command + i, strlen(command) - i + 1);
 
+        /* Remove trailing spaces */
+        i = strlen(command) - 1;
+        while (i >= 0 && command[i] == ' ')
+            command[i--] = '\0';
+
+        /* Skip if empty after removing spaces */
+        if (strlen(command) == 0)
+            continue;
+
+        /* Fork process */
         pid = fork();
+        if (pid == -1)
+        {
+            perror("fork");
+            continue;
+        }
+
         if (pid == 0)
         {
-            if (execve(line, args, NULL) == -1)
+            /* Child process */
+            char *args[] = {NULL};
+            
+            if (execve(command, args, NULL) == -1)
             {
                 fprintf(stderr, "./shell: No such file or directory\n");
                 exit(EXIT_FAILURE);
             }
         }
-        else if (pid > 0)
-        {
-            wait(&status);
-        }
         else
         {
-            perror("fork");
+            /* Parent process */
+            wait(&status);
         }
     }
 
