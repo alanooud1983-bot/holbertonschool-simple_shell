@@ -5,8 +5,7 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 
-#define MAX_COMMAND_LENGTH 100
-#define MAX_ARGS 10
+#define MAX_COMMAND_LENGTH 1024
 
 /**
  * file_exists - Check if a file exists and is executable
@@ -26,50 +25,42 @@ int file_exists(char *filename)
 }
 
 /**
- * remove_spaces - Remove leading and trailing spaces
+ * trim_spaces - Remove leading and trailing spaces
  * @str: The string to process
+ * Return: Pointer to the trimmed string
  */
-void remove_spaces(char *str)
+char *trim_spaces(char *str)
 {
-    int i = 0, j = 0;
-    int len = strlen(str);
+    char *end;
     
     /* Remove leading spaces */
-    while (str[i] == ' ')
-        i++;
-    
-    /* Shift characters */
-    for (j = 0; i < len; i++, j++)
-        str[j] = str[i];
-    str[j] = '\0';
+    while (*str == ' ')
+        str++;
     
     /* Remove trailing spaces */
-    len = strlen(str);
-    while (len > 0 && str[len - 1] == ' ')
-    {
-        str[len - 1] = '\0';
-        len--;
-    }
+    end = str + strlen(str) - 1;
+    while (end > str && *end == ' ')
+        end--;
+    
+    *(end + 1) = '\0';
+    
+    return str;
 }
 
 /**
- * split_command - Split command into arguments
- * @command: The command string
- * @args: Array to store arguments
+ * is_empty - Check if string contains only spaces
+ * @str: The string to check
+ * Return: 1 if empty, 0 otherwise
  */
-void split_command(char *command, char *args[])
+int is_empty(char *str)
 {
-    int i = 0;
-    char *token;
-
-    token = strtok(command, " ");
-    while (token != NULL && i < MAX_ARGS - 1)
+    while (*str)
     {
-        args[i] = token;
-        i++;
-        token = strtok(NULL, " ");
+        if (*str != ' ')
+            return (0);
+        str++;
     }
-    args[i] = NULL;
+    return (1);
 }
 
 /**
@@ -79,12 +70,12 @@ void split_command(char *command, char *args[])
 int main(void)
 {
     char command[MAX_COMMAND_LENGTH];
-    char command_copy[MAX_COMMAND_LENGTH];
-    char *args[MAX_ARGS];
+    char *args[2];
     pid_t pid;
     int status;
     ssize_t bytes_read;
     int interactive;
+    char *trimmed_cmd;
 
     interactive = isatty(STDIN_FILENO);
 
@@ -98,7 +89,6 @@ int main(void)
         
         if (bytes_read == -1)
         {
-            perror("read");
             break;
         }
         else if (bytes_read == 0)
@@ -114,31 +104,28 @@ int main(void)
         if (bytes_read > 0 && command[bytes_read - 1] == '\n')
             command[bytes_read - 1] = '\0';
 
-        /* Make a copy for processing */
-        strcpy(command_copy, command);
-
-        /* Remove spaces from original for empty check */
-        remove_spaces(command);
-
-        /* Skip empty commands */
-        if (strlen(command) == 0)
+        /* Trim spaces and check if empty */
+        trimmed_cmd = trim_spaces(command);
+        
+        if (is_empty(trimmed_cmd))
             continue;
 
-        /* Split command into arguments */
-        split_command(command_copy, args);
-
-        /* Check if the command (first argument) exists */
-        if (file_exists(args[0]) == 0)
+        /* Check if file exists */
+        if (file_exists(trimmed_cmd) == 0)
         {
             fprintf(stderr, "./shell: No such file or directory\n");
             continue;
         }
 
+        /* Prepare arguments */
+        args[0] = trimmed_cmd;
+        args[1] = NULL;
+
         pid = fork();
         if (pid == 0)
         {
-            /* Child process - execute with arguments */
-            if (execve(args[0], args, NULL) == -1)
+            /* Child process */
+            if (execve(trimmed_cmd, args, NULL) == -1)
             {
                 perror("./shell");
                 exit(EXIT_FAILURE);
@@ -146,6 +133,7 @@ int main(void)
         }
         else if (pid > 0)
         {
+            /* Parent process */
             wait(&status);
         }
         else
