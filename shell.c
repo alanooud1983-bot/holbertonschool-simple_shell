@@ -4,7 +4,29 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
-#define MAX_COMMAND_LENGTH 1024
+#define BUFFER_SIZE 1024
+
+/**
+ * _getline - Simple getline implementation
+ * @line: Buffer to store the line
+ * @n: Size of buffer
+ * @stream: File stream
+ * Return: Number of characters read
+ */
+ssize_t _getline(char *line, size_t n, FILE *stream)
+{
+    int c;
+    size_t i = 0;
+
+    while (i < n - 1 && (c = getc(stream)) != EOF)
+    {
+        line[i++] = c;
+        if (c == '\n')
+            break;
+    }
+    line[i] = '\0';
+    return (i > 0 ? (ssize_t)i : -1);
+}
 
 /**
  * main - Simple Shell 0.1
@@ -12,68 +34,39 @@
  */
 int main(void)
 {
-    char command[MAX_COMMAND_LENGTH];
+    char line[BUFFER_SIZE];
     char *args[2];
     pid_t pid;
     int status;
-    ssize_t bytes_read;
-    int interactive;
-    int i;
-
-    interactive = isatty(STDIN_FILENO);
+    ssize_t read;
+    int interactive = 1;
 
     while (1)
     {
-        /* Display prompt */
         if (interactive)
             printf("#cisfun$ ");
         fflush(stdout);
 
-        /* Read command */
-        bytes_read = read(STDIN_FILENO, command, MAX_COMMAND_LENGTH - 1);
+        read = _getline(line, BUFFER_SIZE, stdin);
         
-        if (bytes_read == -1)
+        if (read == -1)
             break;
-        else if (bytes_read == 0) /* Ctrl+D */
-        {
-            if (interactive)
-                printf("\n");
-            break;
-        }
 
-        /* Null terminate and remove newline */
-        command[bytes_read] = '\0';
-        if (bytes_read > 0 && command[bytes_read - 1] == '\n')
-            command[bytes_read - 1] = '\0';
+        /* Remove newline */
+        if (read > 0 && line[read - 1] == '\n')
+            line[read - 1] = '\0';
 
-        /* Skip empty lines or lines with only spaces */
-        for (i = 0; command[i]; i++)
-        {
-            if (command[i] != ' ')
-                break;
-        }
-        if (command[i] == '\0')
+        /* Skip empty lines */
+        if (strlen(line) == 0)
             continue;
 
-        /* Remove leading spaces */
-        while (command[0] == ' ')
-            memmove(command, command + 1, strlen(command));
-
-        /* Remove trailing spaces */
-        i = strlen(command) - 1;
-        while (i >= 0 && command[i] == ' ')
-            command[i--] = '\0';
-
-        /* Prepare arguments */
-        args[0] = command;
+        args[0] = line;
         args[1] = NULL;
 
-        /* Fork and execute */
         pid = fork();
         if (pid == 0)
         {
-            /* Child process */
-            if (execve(command, args, NULL) == -1)
+            if (execve(line, args, NULL) == -1)
             {
                 fprintf(stderr, "./shell: No such file or directory\n");
                 exit(EXIT_FAILURE);
@@ -81,7 +74,6 @@ int main(void)
         }
         else if (pid > 0)
         {
-            /* Parent process */
             wait(&status);
         }
         else
