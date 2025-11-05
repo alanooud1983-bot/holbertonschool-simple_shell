@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 
 #define MAX_COMMAND_LENGTH 100
+#define MAX_ARGS 10
 
 /**
  * file_exists - Check if a file exists and is executable
@@ -30,19 +31,17 @@ int file_exists(char *filename)
  */
 void remove_spaces(char *str)
 {
-    int i, j;
+    int i = 0, j = 0;
     int len = strlen(str);
     
     /* Remove leading spaces */
-    i = 0;
     while (str[i] == ' ')
         i++;
     
-    if (i > 0)
-    {
-        for (j = 0; j < len - i + 1; j++)
-            str[j] = str[j + i];
-    }
+    /* Shift characters */
+    for (j = 0; i < len; i++, j++)
+        str[j] = str[i];
+    str[j] = '\0';
     
     /* Remove trailing spaces */
     len = strlen(str);
@@ -54,12 +53,34 @@ void remove_spaces(char *str)
 }
 
 /**
+ * split_command - Split command into arguments
+ * @command: The command string
+ * @args: Array to store arguments
+ */
+void split_command(char *command, char *args[])
+{
+    int i = 0;
+    char *token;
+
+    token = strtok(command, " ");
+    while (token != NULL && i < MAX_ARGS - 1)
+    {
+        args[i] = token;
+        i++;
+        token = strtok(NULL, " ");
+    }
+    args[i] = NULL;
+}
+
+/**
  * main - Simple Shell 0.1
  * Return: Always 0
  */
 int main(void)
 {
     char command[MAX_COMMAND_LENGTH];
+    char command_copy[MAX_COMMAND_LENGTH];
+    char *args[MAX_ARGS];
     pid_t pid;
     int status;
     ssize_t bytes_read;
@@ -89,16 +110,25 @@ int main(void)
 
         command[bytes_read] = '\0';
         
+        /* Remove newline */
         if (bytes_read > 0 && command[bytes_read - 1] == '\n')
             command[bytes_read - 1] = '\0';
 
-        /* Remove spaces */
+        /* Make a copy for processing */
+        strcpy(command_copy, command);
+
+        /* Remove spaces from original for empty check */
         remove_spaces(command);
 
+        /* Skip empty commands */
         if (strlen(command) == 0)
             continue;
 
-        if (file_exists(command) == 0)
+        /* Split command into arguments */
+        split_command(command_copy, args);
+
+        /* Check if the command (first argument) exists */
+        if (file_exists(args[0]) == 0)
         {
             fprintf(stderr, "./shell: No such file or directory\n");
             continue;
@@ -107,11 +137,8 @@ int main(void)
         pid = fork();
         if (pid == 0)
         {
-            char *args[2];
-            args[0] = command;
-            args[1] = NULL;
-            
-            if (execve(command, args, NULL) == -1)
+            /* Child process - execute with arguments */
+            if (execve(args[0], args, NULL) == -1)
             {
                 perror("./shell");
                 exit(EXIT_FAILURE);
