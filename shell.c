@@ -25,6 +25,35 @@ int file_exists(char *filename)
 }
 
 /**
+ * remove_spaces - Remove leading and trailing spaces
+ * @str: The string to process
+ */
+void remove_spaces(char *str)
+{
+    int i, j;
+    int len = strlen(str);
+    
+    /* Remove leading spaces */
+    i = 0;
+    while (str[i] == ' ')
+        i++;
+    
+    if (i > 0)
+    {
+        for (j = 0; j < len - i + 1; j++)
+            str[j] = str[j + i];
+    }
+    
+    /* Remove trailing spaces */
+    len = strlen(str);
+    while (len > 0 && str[len - 1] == ' ')
+    {
+        str[len - 1] = '\0';
+        len--;
+    }
+}
+
+/**
  * main - Simple Shell 0.1
  * Return: Always 0
  */
@@ -34,10 +63,13 @@ int main(void)
     pid_t pid;
     int status;
     ssize_t bytes_read;
+    int interactive;
+
+    interactive = isatty(STDIN_FILENO);
 
     while (1)
     {
-        if (isatty(STDIN_FILENO))
+        if (interactive)
             printf("#cisfun$ ");
         fflush(stdout);
 
@@ -50,19 +82,22 @@ int main(void)
         }
         else if (bytes_read == 0)
         {
-            if (isatty(STDIN_FILENO))
+            if (interactive)
                 printf("\n");
             break;
         }
 
         command[bytes_read] = '\0';
+        
         if (bytes_read > 0 && command[bytes_read - 1] == '\n')
             command[bytes_read - 1] = '\0';
+
+        /* Remove spaces */
+        remove_spaces(command);
 
         if (strlen(command) == 0)
             continue;
 
-        /* Check if file exists before forking */
         if (file_exists(command) == 0)
         {
             fprintf(stderr, "./shell: No such file or directory\n");
