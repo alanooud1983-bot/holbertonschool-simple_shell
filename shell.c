@@ -54,6 +54,7 @@ int main(void)
     char command[MAX_COMMAND_LENGTH];
     char command_copy[MAX_COMMAND_LENGTH];
     char *args[MAX_ARGS];
+    char *line;
     pid_t pid;
     int status;
     ssize_t bytes_read;
@@ -82,10 +83,46 @@ int main(void)
         command[bytes_read] = '\0';
         
         /* Remove newline */
-        if (bytes_read > 0 && command[bytes_read - 1] == '\n')
-            command[bytes_read - 1] = '\0';
+	line = strtok(command, "\n");
+	while (line != NULL)
+{
+    int j = 0;
+    while (line[j] == ' ' || line[j] == '\t')
+        j++;
+    if (line[j] == '\0')
+    {
+        line = strtok(NULL, "\n");
+        continue;
+    }
 
-        /* Skip empty lines or lines with only spaces */
+    strcpy(command_copy, line);
+    split_arguments(command_copy, args);
+
+    if (file_exists(args[0]) == 0)
+    {
+        fprintf(stderr, "./shell: No such file or directory\n");
+        line = strtok(NULL, "\n");
+        continue;
+    }
+
+    pid = fork();
+    if (pid == 0)
+    {
+        if (execve(args[0], args, NULL) == -1)
+        {
+            perror("./shell");
+            exit(EXIT_FAILURE);
+        }
+    }
+    else if (pid > 0)
+        wait(&status);
+    else
+        perror("fork");
+
+    line = strtok(NULL, "\n");
+}
+
+	/* Skip empty lines or lines with only spaces */
         for (i = 0; command[i]; i++)
         {
             if (command[i] != ' ')
