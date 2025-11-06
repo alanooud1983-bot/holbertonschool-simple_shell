@@ -3,8 +3,47 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 
-#define MAX_COMMAND_LENGTH 100
+#define MAX_COMMAND_LENGTH 1024
+#define MAX_ARGS 64
+
+/**
+ * file_exists - Check if a file exists and is executable
+ * @filename: The file to check
+ * Return: 1 if exists and executable, 0 otherwise
+ */
+int file_exists(char *filename)
+{
+    struct stat st;
+
+    if (stat(filename, &st) == 0)
+    {
+        if (S_ISREG(st.st_mode) && (st.st_mode & S_IXUSR))
+            return (1);
+    }
+    return (0);
+}
+
+/**
+ * split_arguments - Split command into arguments
+ * @command: The command string
+ * @args: Array to store arguments
+ * Return: Number of arguments
+ */
+int split_arguments(char *command, char *args[])
+{
+    int i = 0;
+    char *token = strtok(command, " ");
+
+    while (token != NULL && i < MAX_ARGS - 1)
+    {
+        args[i++] = token;
+        token = strtok(NULL, " ");
+    }
+    args[i] = NULL;
+    return i;
+}
 
 /**
  * main - Simple Shell 0.1
@@ -13,87 +52,78 @@
 int main(void)
 {
     char command[MAX_COMMAND_LENGTH];
+    char command_copy[MAX_COMMAND_LENGTH];
+    char *args[MAX_ARGS];
     pid_t pid;
     int status;
     ssize_t bytes_read;
-    int interactive = 1;
+    int interactive;
     int i;
+
+    interactive = isatty(STDIN_FILENO);
 
     while (1)
     {
-        /* Display prompt */
         if (interactive)
             printf("#cisfun$ ");
         fflush(stdout);
 
-        /* Read command */
-        bytes_read = read(0, command, MAX_COMMAND_LENGTH - 1);
+        bytes_read = read(STDIN_FILENO, command, MAX_COMMAND_LENGTH - 1);
         
-        /* Handle Ctrl+D */
-        if (bytes_read == 0)
+        if (bytes_read == -1)
+            break;
+        else if (bytes_read == 0)
         {
             if (interactive)
                 printf("\n");
             break;
         }
-        
-        if (bytes_read == -1)
-        {
-            perror("read");
-            break;
-        }
 
-        /* Null terminate */
         command[bytes_read] = '\0';
         
         /* Remove newline */
-        if (command[bytes_read - 1] == '\n')
+        if (bytes_read > 0 && command[bytes_read - 1] == '\n')
             command[bytes_read - 1] = '\0';
 
-        /* Skip empty commands */
-        if (strlen(command) == 0)
-            continue;
-
-        /* Remove leading spaces */
-        i = 0;
-        while (command[i] == ' ')
-            i++;
-        
-        if (i > 0)
-            memmove(command, command + i, strlen(command) - i + 1);
-
-        /* Remove trailing spaces */
-        i = strlen(command) - 1;
-        while (i >= 0 && command[i] == ' ')
-            command[i--] = '\0';
-
-        /* Skip if empty after removing spaces */
-        if (strlen(command) == 0)
-            continue;
-
-        /* Fork process */
-        pid = fork();
-        if (pid == -1)
+        /* Skip empty lines or lines with only spaces */
+        for (i = 0; command[i]; i++)
         {
-            perror("fork");
+            if (command[i] != ' ')
+                break;
+        }
+        if (command[i] == '\0')
+            continue;
+
+        /* Make copy for argument splitting */
+        strcpy(command_copy, command);
+        
+        /* Split into arguments */
+        split_arguments(command_copy, args);
+
+        /* Check if command exists */
+        if (file_exists(args[0]) == 0)
+        {
+            fprintf(stderr, "./shell: No such file or directory\n");
             continue;
         }
 
+        pid = fork();
         if (pid == 0)
         {
-            /* Child process */
-            char *args[] = {NULL};
-            
-            if (execve(command, args, NULL) == -1)
+            /* Child process - execute with all arguments */
+            if (execve(args[0], args, NULL) == -1)
             {
-                fprintf(stderr, "./shell: No such file or directory\n");
+                perror("./shell");
                 exit(EXIT_FAILURE);
             }
         }
+        else if (pid > 0)
+        {
+            wait(&status);
+        }
         else
         {
-            /* Parent process */
-            wait(&status);
+            perror("fork");
         }
     }
 
