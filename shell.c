@@ -6,14 +6,17 @@
 
 /**
  * main - Simple UNIX command line interpreter
- *
- * Return: Always 0.
+ * Return: Always 0
  */
 int main(void)
 {
-    char command[100];
+    char command[1024];
+    char *cmd;
     pid_t pid;
     int status;
+    int only_spaces;
+    int i;
+    char *args[2];
 
     while (1)
     {
@@ -21,31 +24,41 @@ int main(void)
         if (fgets(command, sizeof(command), stdin) == NULL)
         {
             printf("\n");
-            break; /* Handle Ctrl+D */
+            break; /* handle Ctrl+D */
         }
 
-        /* Remove newline character */
-        command[strcspn(command, "\n")] = '\0';
+        command[strcspn(command, "\n")] = '\0'; /* remove newline */
 
-        if (strlen(command) == 0)
-            continue; /* Ignore empty input */
+        only_spaces = 1;
+        for (i = 0; command[i] != '\0'; i++)
+        {
+            if (command[i] != ' ' && command[i] != '\t')
+            {
+                only_spaces = 0;
+                break;
+            }
+        }
+        if (only_spaces)
+            continue;
+
+        cmd = command;
+        while (*cmd == ' ' || *cmd == '\t')
+            cmd++;
 
         pid = fork();
-
         if (pid == -1)
         {
-            perror("Error");
-            exit(1);
+            perror("Error:");
+            exit(EXIT_FAILURE);
         }
         else if (pid == 0)
         {
-            char *args[2];
-	    args[0] = command;
-	    args[1] = NULL;
+            args[0] = cmd;
+            args[1] = NULL;
 
-            if (execve(command, args, NULL) == -1)
+            if (execve(cmd, args, NULL) == -1)
                 perror("./shell");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
         else
         {
@@ -53,5 +66,5 @@ int main(void)
         }
     }
     
-    return(0);
+    return (0);
 }
