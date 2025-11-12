@@ -1,91 +1,107 @@
 #include "shell.h"
 
-/* get value of an env var without getenv (to match project style) */
-static char *get_env(char **envp, const char *name)
+/**
+ * strdup2 - simple strdup (allowed funcs)
+ * @s: source
+ * Return: new heap string or NULL
+ */
+char *strdup2(const char *s)
 {
-	size_t nlen = strlen(name);
+	size_t n, i;
+	char *cpy;
 
-	if (!envp)
-		return (NULL);
-
-	for (; *envp; envp++)
-	{
-		if (strncmp(*envp, name, nlen) == 0 && (*envp)[nlen] == '=')
-			return (*envp + nlen + 1);
-	}
-	return (NULL);
-}
-
-/* Join dir + "/" + cmd into a malloc'ed string */
-static char *join3(const char *a, const char *b, const char *c)
-{
-	size_t la, lb, lc;
-	char *s;
-
-	la = strlen(a);
-	lb = strlen(b);
-	lc = strlen(c);
-
-	s = malloc(la + lb + lc + 1);
 	if (!s)
 		return (NULL);
-
-	memcpy(s, a, la);
-	memcpy(s + la, b, lb);
-	memcpy(s + la + lb, c, lc);
-	s[la + lb + lc] = '\0';
-	return (s);
+	n = strlen(s);
+	cpy = (char *)malloc(n + 1);
+	if (!cpy)
+		return (NULL);
+	for (i = 0; i < n; i++)
+		cpy[i] = s[i];
+	cpy[n] = '\0';
+	return (cpy);
 }
 
 /**
- * resolve_path - if cmd has '/', return strdup(cmd)
- *                else search PATH for an executable
- * Return: malloc'ed path or NULL if not found
+ * join3 - concatenate a + b + c into new heap string
+ */
+char *join3(const char *a, const char *b, const char *c)
+{
+	size_t na = (a ? strlen(a) : 0);
+	size_t nb = (b ? strlen(b) : 0);
+	size_t nc = (c ? strlen(c) : 0);
+	size_t i, j;
+	char *out = (char *)malloc(na + nb + nc + 1);
+
+	if (!out)
+		return (NULL);
+
+	/* copy a */
+	for (i = 0; i < na; i++)
+		out[i] = a[i];
+	/* copy b */
+	for (j = 0; j < nb; j++)
+		out[i + j] = b[j];
+	i += nb;
+	/* copy c */
+	for (j = 0; j < nc; j++)
+		out[i + j] = c[j];
+	out[na + nb + nc] = '\0';
+	return (out);
+}
+
+/**
+ * resolve_path - build an executable full path according to PATH
+ * @cmd: command (may be absolute/relative)
+ * @envp: environment (use environ if NULL)
+ * Return: malloc'd full path if executable, else NULL
  */
 char *resolve_path(const char *cmd, char **envp)
 {
-	struct stat st;
-	char *path, *copy, *tok, *full;
+	char *pathvar, *paths, *tok, *full;
+	char **e = envp ? envp : environ;
+	size_t i;
 
+	/* absolute or relative path supplied */
 	if (!cmd || *cmd == '\0')
 		return (NULL);
+	if (cmd[0] == '/' || cmd[0] == '.')
+		return (access(cmd, X_OK) == 0 ? strdup2(cmd) : NULL);
 
-	/* check if command includes '/' */
-	if (strchr(cmd, '/'))
+	/* fetch PATH */
+	pathvar = NULL;
+	for (i = 0; e && e[i]; i++)
 	{
-		if (stat(cmd, &st) == 0 && (st.st_mode & S_IXUSR))
-			return (strdup(cmd));
-		return (NULL);
+		if (e[i][0] == 'P' && e[i][1] == 'A' && e[i][2] == 'T' &&
+		    e[i][3] == 'H' && e[i][4] == '=')
+		{
+			pathvar = e[i] + 5;
+			break;
+		}
 	}
+	if (!pathvar || pathvar[0] == '\0')
+		return (NULL); /* PATH missing or empty: do not search */
 
-	path = get_env(envp, "PATH");
-	if (!path || *path == '\0')
+	paths = strdup2(pathvar);
+	if (!paths)
 		return (NULL);
 
-	copy = strdup(path);
-	if (!copy)
-		return (NULL);
-
-	tok = strtok(copy, ":");
+	/* tokenize PATH on ':' */
+	tok = strtok(paths, ":");
 	while (tok)
 	{
-		if (*tok == '\0')
-			tok = ".";
-
 		full = join3(tok, "/", cmd);
-		if (!full)
-			break;
-
-		if (stat(full, &st) == 0 && (st.st_mode & S_IXUSR))
+		if (full && access(full, X_OK) == 0)
 		{
-			free(copy);
+			free(paths);
 			return (full);
 		}
-		free(full);
+		if (full)
+			free(full);
 		tok = strtok(NULL, ":");
 	}
 
-	free(copy);
+	free(paths);
 	return (NULL);
 }
 

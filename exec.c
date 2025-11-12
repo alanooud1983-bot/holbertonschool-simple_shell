@@ -1,43 +1,45 @@
 #include "shell.h"
 
-extern char **environ;   /* use the global environment */
-
+/**
+ * execute_command - resolve and run a command
+ * @command: command string (no args for task 4)
+ */
 void execute_command(char *command)
 {
 	pid_t pid;
 	int status;
-	char *argv[2] = { NULL, NULL };
-	char full[1024];
+	char *full;
+	char *argv[2];
 
-	/* Absolute/relative path or resolve via PATH */
-	if (command[0] == '/' || command[0] == '.')
-		strncpy(full, command, sizeof(full) - 1), full[sizeof(full) - 1] = '\0';
-	else if (!resolve_path(command, environ))
+	/* Do not fork if command cannot be resolved (task 4 rule) */
+	full = resolve_path(command, environ);
+	if (!full)
 	{
-		/* If not found, do NOT fork */
-		write(STDERR_FILENO, command, strlen(command));
-		write(STDERR_FILENO, ": not found\n", 12);
+		write(STDOUT_FILENO, command, strlen(command));
+		write(STDOUT_FILENO, ": not found\n", 12);
 		return;
-	}
-	else
-	{
-		strncpy(full, resolve_path(command, environ), sizeof(full) - 1);
-		full[sizeof(full) - 1] = '\0';
 	}
 
 	pid = fork();
 	if (pid == -1)
 	{
 		perror("fork");
+		free(full);
 		return;
 	}
 	if (pid == 0)
 	{
 		argv[0] = full;
-		execve(argv[0], argv, environ);
-		perror("./hsh");
-		_exit(EXIT_FAILURE);
+		argv[1] = NULL;
+		/* pass environ as required */
+		if (execve(full, argv, environ) == -1)
+			perror("./hsh");
+		exit(EXIT_FAILURE);
 	}
-	wait(&status);
+	else
+	{
+		wait(&status);
+		free(full);
+	}
 }
 
