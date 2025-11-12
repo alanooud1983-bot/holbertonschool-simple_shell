@@ -1,30 +1,40 @@
 #include "shell.h"
 
-const char *g_progname;
-
-int main(int argc, char **argv, char **envp)
+/**
+ * main - entry point of a very small shell
+ * @ac: argc (unused)
+ * @av: argv (unused)
+ * @envp: environment passed from kernel
+ * Return: 0 on success
+ */
+int main(int ac, char **av, char **envp)
 {
-    char command[MAX_COMMAND_LENGTH];
-    ssize_t nread;
+    char *line = NULL;
+    size_t n = 0;
+    ssize_t r;
 
-    (void)argc;
-    g_progname = argv[0] ? argv[0] : "hsh";
+    (void)ac;
+    (void)av;
 
     while (1)
     {
-        write(STDOUT_FILENO, "$ ", 2);
+        if (isatty(STDIN_FILENO))
+            write(STDOUT_FILENO, "$ ", 2);
 
-        nread = read(STDIN_FILENO, command, sizeof(command) - 1);
-        if (nread <= 0) { write(STDOUT_FILENO, "\n", 1); break; }
-
-        command[nread - 1] = '\0';
-
-        if (strcmp(command, "exit") == 0)
+        r = getline(&line, &n, stdin);
+        if (r == -1) /* EOF (Ctrl+D) or read error */
             break;
 
-        if (command[0] != '\0')
-            execute_command(command, envp);
+        if (r > 0 && line[r - 1] == '\n')
+            line[r - 1] = '\0'; /* strip newline */
+
+        if (*line == '\0')
+            continue; /* empty line: prompt again */
+
+        execute_command(line, envp);
     }
+
+    free(line);
     return 0;
 }
 

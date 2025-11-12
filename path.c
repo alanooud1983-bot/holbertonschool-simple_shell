@@ -1,64 +1,74 @@
 #include "shell.h"
 
-/* find PATH=... inside envp; return pointer to the value or NULL */
-static char *get_path_value(char **envp)
+/* find PATH=... in envp without using getenv (forbidden) */
+static const char *find_path_var(char *const envp[])
 {
     int i;
-    if (!envp) return NULL;
+
+    if (!envp)
+        return NULL;
+
     for (i = 0; envp[i]; i++)
+    {
         if (strncmp(envp[i], "PATH=", 5) == 0)
             return envp[i] + 5;
+    }
     return NULL;
 }
 
-/* C89-friendly strtok over a heap copy of PATH */
-int resolve_path(const char *cmd, char *out, size_t outsz, char **envp)
+/**
+ * resolve_path - returns malloc'd absolute path to cmd if executable
+ * @cmd: command name (no slash) or NULL
+ * @envp: environment
+ * Return: malloc'd full path (caller frees) or NULL if not found
+ */
+char *resolve_path(const char *cmd, char *const envp[])
 {
-    char *pathval, *copy, *tok;
+    const char *pathvar;
+    char *paths, *dir, *full;
     size_t need;
 
-    if (!cmd || !*cmd) return 0;
+    if (!cmd || !*cmd)
+        return NULL;
 
-    /* absolute/relative path already given */
+    /* if cmd already has a slash, check it directly */
     if (strchr(cmd, '/'))
+        return (access(cmd, X_OK) == 0) ? strdup(cmd) : NULL;
+
+    pathvar = find_path_var(envp);
+    if (!pathvar || !*pathvar)
+        return NULL;
+
+    paths = strdup(pathvar);
+    if (!paths)
+        return NULL;
+
+    dir = strtok(paths, ":");
+    while (dir)
     {
-        size_t n = strlen(cmd);
-        if (n >= outsz) return 0;
-        memcpy(out, cmd, n + 1);
-        return access(out, X_OK) == 0;
-    }
-
-    pathval = get_path_value(envp);
-    if (!pathval || *pathval == '\0')
-        return 0; /* will trigger "not found" with no fork */
-
-    copy = (char *)malloc(strlen(pathval) + 1);
-    if (!copy) return 0;
-    strcpy(copy, pathval);
-
-    /* strtok_r not in C89; use strtok with a private copy */
-    tok = strtok(copy, ":");
-    while (tok)
-    {
-        need = strlen(tok) + 1 + strlen(cmd) + 1; /* dir + '/' + cmd + '\0' */
-        if (need <= outsz)
+        need = strlen(dir) + 1 + strlen(cmd) + 1; /* dir + '/' + cmd + '\0' */
+        full = malloc(need);
+        if (!full)
         {
-            /* build candidate */
-            out[0] = '\0';
-            strcat(out, tok);
-            strcat(out, "/");
-            strcat(out, cmd);
-
-            if (access(out, X_OK) == 0)
-            {
-                free(copy);
-                return 1;
-            }
+            free(paths);
+            return NULL;
         }
-        tok = strtok(NULL, ":");
+
+        strcpy(full, dir);
+        strcat(full, "/");
+        strcat(full, cmd);
+
+        if (access(full, X_OK) == 0)
+        {
+            free(paths);
+            return full; /* caller frees */
+        }
+
+        free(full);
+        dir = strtok(NULL, ":");
     }
 
-    free(copy);
-    return 0;
+    free(paths);
+    return NULL;
 }
 
