@@ -3,8 +3,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
@@ -15,6 +15,9 @@
 /* core */
 void execute_command(char *input, char *const envp[]);
 char *resolve_path(const char *cmd, char *const envp[]);
+
+/* built-ins (task 6) */
+void print_env(char **envp);
 
 #endif /* SHELL_H */
 
