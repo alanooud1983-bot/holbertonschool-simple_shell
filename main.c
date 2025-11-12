@@ -1,49 +1,40 @@
 #include "shell.h"
 
-/* split by spaces/tabs, no quotes; returns argc, argv is NULL-terminated */
-int split_line(char *line, char **argv)
-{
-	int argc = 0;
-	char *tok;
-
-	for (tok = strtok(line, " \t\r\n"); tok && argc < (MAX_ARGS - 1);
-	     tok = strtok(NULL, " \t\r\n"))
-		argv[argc++] = tok;
-	argv[argc] = NULL;
-	return (argc);
-}
-
+/**
+ * main - entry point of a very small shell
+ * @ac: argc (unused)
+ * @av: argv (unused)
+ * @envp: environment passed from kernel
+ * Return: 0 on success
+ */
 int main(int ac, char **av, char **envp)
 {
-	char *line = NULL;
-	size_t n = 0;
-	ssize_t r;
-	char *argv[MAX_ARGS];
-	(void)ac;
-	(void)av;
+    char *line = NULL;
+    size_t n = 0;
+    ssize_t r;
 
-	while (1)
-	{
-		/* interactive prompt (checker ignores it; OK to always write) */
-		write(STDOUT_FILENO, "$ ", 2);
+    (void)ac;
+    (void)av;
 
-		r = getline(&line, &n, stdin);
-		if (r == -1)
-		{
-			write(STDOUT_FILENO, "\n", 1); /* Ctrl-D case */
-			break;
-		}
+    while (1)
+    {
+        if (isatty(STDIN_FILENO))
+            write(STDOUT_FILENO, "$ ", 2);
 
-		if (split_line(line, argv) == 0)
-			continue;
+        r = getline(&line, &n, stdin);
+        if (r == -1) /* EOF (Ctrl+D) or read error */
+            break;
 
-		if (strcmp(argv[0], "exit") == 0)
-			break;
+        if (r > 0 && line[r - 1] == '\n')
+            line[r - 1] = '\0'; /* strip newline */
 
-		execute_command(argv, envp);
-	}
+        if (*line == '\0')
+            continue; /* empty line: prompt again */
 
-	free(line);
-	return (0);
+        execute_command(line, envp);
+    }
+
+    free(line);
+    return 0;
 }
 

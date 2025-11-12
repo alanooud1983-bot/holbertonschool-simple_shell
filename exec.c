@@ -1,45 +1,65 @@
 #include "shell.h"
 
 /**
- * execute_command - resolve cmd, fork/exec if found; else print not found
- * @argv: argument vector (argv[0] is cmd)
+ * execute_command - parses a line and runs the command
+ * @input: whole line typed by the user
  * @envp: environment
  */
-void execute_command(char **argv, char **envp)
+void execute_command(char *input, char *const envp[])
 {
-	pid_t pid;
-	int status;
-	char *full;
+    char *argv[MAX_ARGS];
+    int argc = 0;
+    char *tok, *path = NULL;
+    pid_t pid;
+    int status;
 
-	if (!argv || !argv[0] || argv[0][0] == '\0')
-		return;
+    /* tokenize by spaces/tabs */
+    tok = strtok(input, " \t");
+    while (tok && argc < MAX_ARGS - 1)
+    {
+        argv[argc++] = tok;
+        tok = strtok(NULL, " \t");
+    }
+    argv[argc] = NULL;
 
-	full = resolve_path(argv[0], envp);
-	if (!full)
-	{
-		/* Do NOT fork; just print error then return */
-		dprintf(STDERR_FILENO, "%s: not found\n", argv[0]);
-		return;
-	}
+    if (argc == 0)
+        return;
 
-	pid = fork();
-	if (pid == -1)
-	{
-		perror("fork");
-		free(full);
-		return;
-	}
-	if (pid == 0)
-	{
-		/* child */
-		execve(full, argv, envp);
-		/* if execve returns, it failed */
-		perror(full);
-		_exit(127);
-	}
-	/* parent */
-	free(full);
-	waitpid(pid, &status, 0);
-	(void)status;
+    /* built-in: exit */
+    if (strcmp(argv[0], "exit") == 0)
+        exit(0);
+
+    /* find executable: absolute/relative or via PATH */
+    if (strchr(argv[0], '/'))
+        path = strdup(argv[0]);
+    else
+        path = resolve_path(argv[0], (char *const *)envp);
+
+    if (!path)
+    {
+        /* Requirement: do NOT fork when command doesn't exist */
+        dprintf(STDERR_FILENO, "%s: not found\n", argv[0]);
+        return;
+    }
+
+    pid = fork();
+    if (pid == -1)
+    {
+        perror("fork");
+        free(path);
+        return;
+    }
+    if (pid == 0)
+    {
+        execve(path, argv, (char *const *)envp);
+        perror("execve"); /* only if execve fails */
+        _exit(127);
+    }
+    else
+    {
+        waitpid(pid, &status, 0);
+    }
+
+    free(path);
 }
 

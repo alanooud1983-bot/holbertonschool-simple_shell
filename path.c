@@ -1,77 +1,74 @@
 #include "shell.h"
 
-/* find PATH=... inside envp (no getenv) */
-static char *get_path_from_envp(char **envp)
+/* find PATH=... in envp without using getenv (forbidden) */
+static const char *find_path_var(char *const envp[])
 {
-	int i;
+    int i;
 
-	if (!envp)
-		return (NULL);
-	for (i = 0; envp[i]; i++)
-		if (strncmp(envp[i], "PATH=", 5) == 0)
-			return (envp[i] + 5); /* pointer to value after PATH= */
-	return (NULL);
+    if (!envp)
+        return NULL;
+
+    for (i = 0; envp[i]; i++)
+    {
+        if (strncmp(envp[i], "PATH=", 5) == 0)
+            return envp[i] + 5;
+    }
+    return NULL;
 }
 
 /**
- * resolve_path - return malloc'ed absolute path to cmd or NULL if not found
- * @cmd: command (possibly with '/')
+ * resolve_path - returns malloc'd absolute path to cmd if executable
+ * @cmd: command name (no slash) or NULL
  * @envp: environment
+ * Return: malloc'd full path (caller frees) or NULL if not found
  */
-char *resolve_path(const char *cmd, char **envp)
+char *resolve_path(const char *cmd, char *const envp[])
 {
-	char *pathval, *copy, *tok, *full;
-	size_t need;
+    const char *pathvar;
+    char *paths, *dir, *full;
+    size_t need;
 
-	if (!cmd || !*cmd)
-		return (NULL);
+    if (!cmd || !*cmd)
+        return NULL;
 
-	/* If command already contains '/', check directly */
-	if (strchr(cmd, '/'))
-	{
-		if (access(cmd, X_OK) == 0)
-			return (strdup(cmd));
-		return (NULL);
-	}
+    /* if cmd already has a slash, check it directly */
+    if (strchr(cmd, '/'))
+        return (access(cmd, X_OK) == 0) ? strdup(cmd) : NULL;
 
-	/* No '/', search PATH */
-	pathval = get_path_from_envp(envp);
-	if (!pathval || *pathval == '\0')
-		return (NULL); /* empty or missing PATH -> treat as not found */
+    pathvar = find_path_var(envp);
+    if (!pathvar || !*pathvar)
+        return NULL;
 
-	copy = strdup(pathval);
-	if (!copy)
-		return (NULL);
+    paths = strdup(pathvar);
+    if (!paths)
+        return NULL;
 
-	tok = strtok(copy, ":");
-	while (tok)
-	{
-		/* empty token means current directory "." */
-		if (*tok == '\0')
-			tok = ".";
+    dir = strtok(paths, ":");
+    while (dir)
+    {
+        need = strlen(dir) + 1 + strlen(cmd) + 1; /* dir + '/' + cmd + '\0' */
+        full = malloc(need);
+        if (!full)
+        {
+            free(paths);
+            return NULL;
+        }
 
-		need = strlen(tok) + 1 /* slash */ + strlen(cmd) + 1 /* NUL */;
-		full = malloc(need);
-		if (!full)
-		{
-			free(copy);
-			return (NULL);
-		}
+        strcpy(full, dir);
+        strcat(full, "/");
+        strcat(full, cmd);
 
-		strcpy(full, tok);
-		strcat(full, "/");
-		strcat(full, cmd);
+        if (access(full, X_OK) == 0)
+        {
+            free(paths);
+            return full; /* caller frees */
+        }
 
-		if (access(full, X_OK) == 0)
-		{
-			free(copy);
-			return (full); /* found */
-		}
-		free(full);
-		tok = strtok(NULL, ":");
-	}
+        free(full);
+        dir = strtok(NULL, ":");
+    }
 
-	free(copy);
-	return (NULL);
+    free(paths);
+    return NULL;
 }
 
