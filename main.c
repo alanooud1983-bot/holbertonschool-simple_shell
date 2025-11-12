@@ -1,27 +1,46 @@
 #include "shell.h"
 
-int main(void)
+/**
+ * main - simple shell loop (Task 4: 0.3)
+ * @ac: arg count
+ * @av: arg vector
+ * @envp: environment
+ * Return: 0 on success
+ */
+int main(int ac, char **av, char **envp)
 {
-	char *line = NULL;
-	size_t len = 0;
-	ssize_t nread;
+	char line[MAX_COMMAND_LENGTH];
+
+	(void)ac;
+	(void)av;
 
 	while (1)
 	{
+		/* interactive prompt */
 		if (isatty(STDIN_FILENO))
-			printf(":) ");
+			write(STDOUT_FILENO, ":) ", 3);
 
-		nread = getline(&line, &len, stdin);
-		if (nread == -1)
+		if (!fgets(line, sizeof(line), stdin))
+			break; /* EOF (Ctrl-D) */
+
+		/* remove trailing newline */
+		{
+			size_t n = strlen(line);
+			if (n && line[n - 1] == '\n')
+				line[n - 1] = '\0';
+		}
+
+		/* empty line -> prompt again */
+		if (line[0] == '\0')
+			continue;
+
+		/* optional built-in exit */
+		if (strcmp(line, "exit") == 0)
 			break;
 
-		if (line[nread - 1] == '\n')
-			line[nread - 1] = '\0';
-
-		if (*line)
-			execute_command(line);
+		execute_command(line, envp);
 	}
 
-	free(line);
 	return (0);
 }
+

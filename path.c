@@ -1,53 +1,57 @@
 #include "shell.h"
 
 /**
- * resolve_command - Finds full path of a command using PATH
- * @cmd: command name
- * @out: buffer to store full path
- * @out_sz: buffer size
+ * resolve_path - returns malloc'ed absolute path for cmd or NULL if not found
+ * @cmd: command to resolve
+ * @envp: environment (used for PATH)
  *
- * Return: 1 if found and executable, 0 if not
+ * Return: pointer to malloc'ed full path (caller frees) or NULL
  */
-int resolve_command(const char *cmd, char *out, size_t out_sz)
+char *resolve_path(const char *cmd, char *const envp[])
 {
-    char *path, *copy, *dir;
+	char *path, *dup, *tok, buf[MAX_COMMAND_LENGTH];
 
-    if (!cmd || !*cmd)
-        return (0);
+	(void)envp; /* we’ll use getenv which is allowed */
+	if (!cmd || *cmd == '\0')
+		return (NULL);
 
-    /* Direct path */
-    if (strchr(cmd, '/'))
-    {
-        if (access(cmd, X_OK) == 0)
-        {
-            snprintf(out, out_sz, "%s", cmd);
-            return (1);
-        }
-        return (0);
-    }
+	/* if cmd already has a slash, check directly */
+	if (strchr(cmd, '/'))
+	{
+		if (access(cmd, X_OK) == 0)
+			return (strdup(cmd));
+		return (NULL);
+	}
 
-    /* Search PATH */
-    path = getenv("PATH");
-    if (!path)
-        return (0);
+	path = getenv("PATH");
+	if (!path || *path == '\0')
+		return (NULL);
 
-    copy = strdup(path);
-    if (!copy)
-        return (0);
+	dup = strdup(path);
+	if (!dup)
+		return (NULL);
 
-    for (dir = strtok(copy, ":"); dir; dir = strtok(NULL, ":"))
-    {
-        if (snprintf(out, out_sz, "%s/%s", dir, cmd) >= (int)out_sz)
-            continue;
+	for (tok = strtok(dup, ":"); tok; tok = strtok(NULL, ":"))
+	{
+		size_t len = strlen(tok);
 
-        if (access(out, X_OK) == 0)
-        {
-            free(copy);
-            return (1);
-        }
-    }
+		if (len + 1 + strlen(cmd) + 1 >= sizeof(buf))
+			continue;
 
-    free(copy);
-    return (0);
+		strcpy(buf, tok);
+		if (len && buf[len - 1] != '/')
+			strcat(buf, "/");
+		strcat(buf, cmd);
+
+		if (access(buf, X_OK) == 0)
+		{
+			char *ret = strdup(buf);
+			free(dup);
+			return (ret);
+		}
+	}
+
+	free(dup);
+	return (NULL);
 }
 

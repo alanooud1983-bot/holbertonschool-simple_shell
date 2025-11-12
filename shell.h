@@ -3,24 +3,19 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <stddef.h>     /* for size_t */
+#include <string.h>
+#include <errno.h>
 
-#define MAX_COMMAND_LENGTH 100
+#define MAX_COMMAND_LENGTH 1024
+#define MAX_ARGS 64
 
-/* so exec.c can pass env to execve() */
-extern char **environ;
-
-/* prototypes used across the project */
-void execute_command(char *command);
-
-/* Fills full with an absolute path to cmd from PATH.
- * Returns 1 if found, 0 if not.
- */
-int resolve_command(const char *cmd, char *full, size_t full_size);
+/* Prototypes */
+int  parse_args(char *line, char *argv[], size_t max_args);
+char *resolve_path(const char *cmd, char *const envp[]);
+void execute_command(char *line, char *const envp[]);
 
 #endif /* SHELL_H */
 
