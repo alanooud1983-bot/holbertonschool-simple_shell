@@ -22,15 +22,7 @@ A tiny UNIX command-line interpreter in C.
 
 > Repo also contains runtime/test artifacts: `hsh` (binary), `hbtn_ls` (checker helper), `simple_shell` (wrapper).
 
-# Build
-```bash
-gcc -Wall -Werror -Wextra -pedantic -std=gnu89 *.c -o hsh
-
-
-
-## In conclusion : 
-```What Did we  Learn?
-
+## What did we learn ? 
 1. How to create and manage processes with fork and execve
 
 2. How environment variables work and how PATH lookup is performed
@@ -50,6 +42,11 @@ At the end ...
 “The best way to understand a system… is to build it.”
 
 Developed with ❤️ and a lot of debugging caffeine ☕ as part of Holberton School’s Simple Shell project.
+
+
+# Build
+```bash
+gcc -Wall -Werror -Wextra -pedantic -std=gnu89 *.c -o hsh
 
 
 
