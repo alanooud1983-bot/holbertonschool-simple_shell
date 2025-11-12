@@ -1,46 +1,40 @@
 #include "shell.h"
 
 /**
- * main - simple shell loop (Task 4: 0.3)
- * @ac: arg count
- * @av: arg vector
- * @envp: environment
+ * main - entry point of a very small shell
+ * @ac: argc (unused)
+ * @av: argv (unused)
+ * @envp: environment passed from kernel
  * Return: 0 on success
  */
 int main(int ac, char **av, char **envp)
 {
-	char line[MAX_COMMAND_LENGTH];
+    char *line = NULL;
+    size_t n = 0;
+    ssize_t r;
 
-	(void)ac;
-	(void)av;
+    (void)ac;
+    (void)av;
 
-	while (1)
-	{
-		/* interactive prompt */
-		if (isatty(STDIN_FILENO))
-			write(STDOUT_FILENO, ":) ", 3);
+    while (1)
+    {
+        if (isatty(STDIN_FILENO))
+            write(STDOUT_FILENO, "$ ", 2);
 
-		if (!fgets(line, sizeof(line), stdin))
-			break; /* EOF (Ctrl-D) */
+        r = getline(&line, &n, stdin);
+        if (r == -1) /* EOF (Ctrl+D) or read error */
+            break;
 
-		/* remove trailing newline */
-		{
-			size_t n = strlen(line);
-			if (n && line[n - 1] == '\n')
-				line[n - 1] = '\0';
-		}
+        if (r > 0 && line[r - 1] == '\n')
+            line[r - 1] = '\0'; /* strip newline */
 
-		/* empty line -> prompt again */
-		if (line[0] == '\0')
-			continue;
+        if (*line == '\0')
+            continue; /* empty line: prompt again */
 
-		/* optional built-in exit */
-		if (strcmp(line, "exit") == 0)
-			break;
+        execute_command(line, envp);
+    }
 
-		execute_command(line, envp);
-	}
-
-	return (0);
+    free(line);
+    return 0;
 }
 

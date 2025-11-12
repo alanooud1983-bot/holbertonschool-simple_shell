@@ -1,57 +1,74 @@
 #include "shell.h"
 
+/* find PATH=... in envp without using getenv (forbidden) */
+static const char *find_path_var(char *const envp[])
+{
+    int i;
+
+    if (!envp)
+        return NULL;
+
+    for (i = 0; envp[i]; i++)
+    {
+        if (strncmp(envp[i], "PATH=", 5) == 0)
+            return envp[i] + 5;
+    }
+    return NULL;
+}
+
 /**
- * resolve_path - returns malloc'ed absolute path for cmd or NULL if not found
- * @cmd: command to resolve
- * @envp: environment (used for PATH)
- *
- * Return: pointer to malloc'ed full path (caller frees) or NULL
+ * resolve_path - returns malloc'd absolute path to cmd if executable
+ * @cmd: command name (no slash) or NULL
+ * @envp: environment
+ * Return: malloc'd full path (caller frees) or NULL if not found
  */
 char *resolve_path(const char *cmd, char *const envp[])
 {
-	char *path, *dup, *tok, buf[MAX_COMMAND_LENGTH];
+    const char *pathvar;
+    char *paths, *dir, *full;
+    size_t need;
 
-	(void)envp; /* we’ll use getenv which is allowed */
-	if (!cmd || *cmd == '\0')
-		return (NULL);
+    if (!cmd || !*cmd)
+        return NULL;
 
-	/* if cmd already has a slash, check directly */
-	if (strchr(cmd, '/'))
-	{
-		if (access(cmd, X_OK) == 0)
-			return (strdup(cmd));
-		return (NULL);
-	}
+    /* if cmd already has a slash, check it directly */
+    if (strchr(cmd, '/'))
+        return (access(cmd, X_OK) == 0) ? strdup(cmd) : NULL;
 
-	path = getenv("PATH");
-	if (!path || *path == '\0')
-		return (NULL);
+    pathvar = find_path_var(envp);
+    if (!pathvar || !*pathvar)
+        return NULL;
 
-	dup = strdup(path);
-	if (!dup)
-		return (NULL);
+    paths = strdup(pathvar);
+    if (!paths)
+        return NULL;
 
-	for (tok = strtok(dup, ":"); tok; tok = strtok(NULL, ":"))
-	{
-		size_t len = strlen(tok);
+    dir = strtok(paths, ":");
+    while (dir)
+    {
+        need = strlen(dir) + 1 + strlen(cmd) + 1; /* dir + '/' + cmd + '\0' */
+        full = malloc(need);
+        if (!full)
+        {
+            free(paths);
+            return NULL;
+        }
 
-		if (len + 1 + strlen(cmd) + 1 >= sizeof(buf))
-			continue;
+        strcpy(full, dir);
+        strcat(full, "/");
+        strcat(full, cmd);
 
-		strcpy(buf, tok);
-		if (len && buf[len - 1] != '/')
-			strcat(buf, "/");
-		strcat(buf, cmd);
+        if (access(full, X_OK) == 0)
+        {
+            free(paths);
+            return full; /* caller frees */
+        }
 
-		if (access(buf, X_OK) == 0)
-		{
-			char *ret = strdup(buf);
-			free(dup);
-			return (ret);
-		}
-	}
+        free(full);
+        dir = strtok(NULL, ":");
+    }
 
-	free(dup);
-	return (NULL);
+    free(paths);
+    return NULL;
 }
 

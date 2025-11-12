@@ -3,19 +3,18 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <string.h>
-#include <errno.h>
+#include <sys/stat.h>
+#include <limits.h>
 
-#define MAX_COMMAND_LENGTH 1024
 #define MAX_ARGS 64
 
-/* Prototypes */
-int  parse_args(char *line, char *argv[], size_t max_args);
+/* core */
+void execute_command(char *input, char *const envp[]);
 char *resolve_path(const char *cmd, char *const envp[]);
-void execute_command(char *line, char *const envp[]);
 
 #endif /* SHELL_H */
 

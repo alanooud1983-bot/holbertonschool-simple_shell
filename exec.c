@@ -1,69 +1,65 @@
 #include "shell.h"
 
 /**
- * parse_args - tokenize a line into argv
- * @line: mutable input line
- * @argv: output array
- * @max_args: capacity of argv
- * Return: argc (number of tokens)
- */
-int parse_args(char *line, char *argv[], size_t max_args)
-{
-	size_t i = 0;
-	char *tok = strtok(line, " \t\r");
-
-	while (tok && i + 1 < max_args)
-	{
-		argv[i++] = tok;
-		tok = strtok(NULL, " \t\r");
-	}
-	argv[i] = NULL;
-	return ((int)i);
-}
-
-/**
- * execute_command - resolves via PATH and, if found, forks then execve's
- *                  (does not fork if command is missing)
- * @line: raw command line (modified by tokenizer)
+ * execute_command - parses a line and runs the command
+ * @input: whole line typed by the user
  * @envp: environment
  */
-void execute_command(char *line, char *const envp[])
+void execute_command(char *input, char *const envp[])
 {
-	char *argv[MAX_ARGS];
-	char *full;
+    char *argv[MAX_ARGS];
+    int argc = 0;
+    char *tok, *path = NULL;
+    pid_t pid;
+    int status;
 
-	if (parse_args(line, argv, MAX_ARGS) == 0)
-		return; /* nothing to do */
+    /* tokenize by spaces/tabs */
+    tok = strtok(input, " \t");
+    while (tok && argc < MAX_ARGS - 1)
+    {
+        argv[argc++] = tok;
+        tok = strtok(NULL, " \t");
+    }
+    argv[argc] = NULL;
 
-	/* Task 4 requirement: do NOT fork if command does not exist */
-	full = resolve_path(argv[0], envp);
-	if (!full)
-	{
-		/* print the canonical error and try again */
-		write(STDERR_FILENO, "Command not found\n", 18);
-		return;
-	}
+    if (argc == 0)
+        return;
 
-	{
-		pid_t pid = fork();
-		int status;
+    /* built-in: exit */
+    if (strcmp(argv[0], "exit") == 0)
+        exit(0);
 
-		if (pid == -1)
-		{
-			perror("fork");
-			free(full);
-			return;
-		}
-		if (pid == 0)
-		{
-			execve(full, argv, envp);
-			/* If execve returns, it failed */
-			perror(argv[0]);
-			free(full);
-			_exit(127);
-		}
-		free(full);
-		waitpid(pid, &status, 0);
-	}
+    /* find executable: absolute/relative or via PATH */
+    if (strchr(argv[0], '/'))
+        path = strdup(argv[0]);
+    else
+        path = resolve_path(argv[0], (char *const *)envp);
+
+    if (!path)
+    {
+        /* Requirement: do NOT fork when command doesn't exist */
+        dprintf(STDERR_FILENO, "%s: not found\n", argv[0]);
+        return;
+    }
+
+    pid = fork();
+    if (pid == -1)
+    {
+        perror("fork");
+        free(path);
+        return;
+    }
+    if (pid == 0)
+    {
+        execve(path, argv, (char *const *)envp);
+        perror("execve"); /* only if execve fails */
+        _exit(127);
+    }
+    else
+    {
+        waitpid(pid, &status, 0);
+    }
+
+    free(path);
 }
 
