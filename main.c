@@ -16,25 +16,30 @@ int main(int ac, char **av, char **envp)
     (void)ac;
     (void)av;
 
-    while (1)
-    {
-        if (isatty(STDIN_FILENO))
-            write(STDOUT_FILENO, "$ ", 2);
+	while (1)
+{
+    r = getline(&line, &n, stdin);
+    if (r == -1) /* EOF (Ctrl+D) or read error */
+        break;
 
-        r = getline(&line, &n, stdin);
-        if (r == -1) /* EOF (Ctrl+D) or read error */
-            break;
+    if (r > 0 && line[r - 1] == '\n')
+        line[r - 1] = '\0'; /* strip newline */
 
-        if (r > 0 && line[r - 1] == '\n')
-            line[r - 1] = '\0'; /* strip newline */
+    if (*line == '\0')
+        continue; /* empty line: prompt again */
 
-        if (*line == '\0')
-            continue; /* empty line: prompt again */
-	if (strcmp(line, "exit") == 0)
-	 break;
+    /* === Task 5: exit built-in === */
+    if (strcmp(line, "exit") == 0)
+        break;
+    /* ============================ */
 
-        execute_command(line, envp);
-    }
+    execute_command(line, envp);
+
+    /* print prompt only after command succeeds */
+    if (isatty(STDIN_FILENO))
+        write(STDOUT_FILENO, "$ ", 2);
+}
+
 
     free(line);
     return 0;
