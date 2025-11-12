@@ -1,24 +1,45 @@
 #include "shell.h"
 
-void execute_command(char *command)
+/**
+ * execute_command - resolve cmd, fork/exec if found; else print not found
+ * @argv: argument vector (argv[0] is cmd)
+ * @envp: environment
+ */
+void execute_command(char **argv, char **envp)
 {
-    pid_t pid;
-    char *argv[2];
-    char *path;
+	pid_t pid;
+	int status;
+	char *full;
 
-    argv[0] = command;
-    argv[1] = NULL;
+	if (!argv || !argv[0] || argv[0][0] == '\0')
+		return;
 
-    path = resolve_path(command);
+	full = resolve_path(argv[0], envp);
+	if (!full)
+	{
+		/* Do NOT fork; just print error then return */
+		dprintf(STDERR_FILENO, "%s: not found\n", argv[0]);
+		return;
+	}
 
-    pid = fork();
-    if (pid == 0)
-    {
-        if (execve(path, argv, environ) == -1)
-            perror("Error");
-        exit(1);
-    }
-    else if (pid > 0)
-        wait(NULL);
+	pid = fork();
+	if (pid == -1)
+	{
+		perror("fork");
+		free(full);
+		return;
+	}
+	if (pid == 0)
+	{
+		/* child */
+		execve(full, argv, envp);
+		/* if execve returns, it failed */
+		perror(full);
+		_exit(127);
+	}
+	/* parent */
+	free(full);
+	waitpid(pid, &status, 0);
+	(void)status;
 }
 

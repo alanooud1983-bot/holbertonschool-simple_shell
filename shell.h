@@ -5,14 +5,21 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
 
 #define MAX_COMMAND_LENGTH 1024
+#define MAX_ARGS 64
 
-extern char **environ;
+/* split */
+int  split_line(char *line, char **argv);
+/* path */
+char *resolve_path(const char *cmd, char **envp);
+/* exec */
+void execute_command(char **argv, char **envp);
 
-void execute_command(char *command);
-char *resolve_path(char *cmd);
-
-#endif
+#endif /* SHELL_H */
 
