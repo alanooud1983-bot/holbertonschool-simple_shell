@@ -1,26 +1,33 @@
 #include "shell.h"
+#include <errno.h>
 
-/*
- * execute_command - run a single command (no arguments).
- * Requirement for task 4:
- *   - If command cannot be resolved, print error and DO NOT fork.
+/* declare environ for execve */
+extern char **environ;
+
+/**
+ * execute_command - run a single command
+ * @command: command name (no arguments for task 4)
+ *
+ * Rules: handle PATH, and do NOT fork if the command doesn't exist.
  */
-void execute_command(char *command, char **envp)
+void execute_command(char *command)
 {
 	pid_t pid;
 	int status;
-	char *full = NULL;
+	char *full;
+	char *argv[2];
 
 	if (!command || *command == '\0')
 		return;
 
-	/* Resolve BEFORE forking */
-	full = resolve_path(command, envp);
-
+	/* resolve from PATH or absolute/relative */
+	full = resolve_path(command, environ);
 	if (!full)
 	{
-		/* Not found: no fork */
-		dprintf(STDERR_FILENO, "%s: not found\n", command);
+		/* command not found: DO NOT fork */
+		write(STDERR_FILENO, "./hsh: 1: ", 10);
+		write(STDERR_FILENO, command, strlen(command));
+		write(STDERR_FILENO, ": not found\n", 12);
 		return;
 	}
 
@@ -28,24 +35,23 @@ void execute_command(char *command, char **envp)
 	if (pid == -1)
 	{
 		perror("fork");
-		free(full != command ? full : NULL);
+		free(full);
 		return;
 	}
 
 	if (pid == 0)
 	{
-		/* child */
-		char *argv[] = { command, NULL };
-		execve(full, argv, envp);
-		/* execve failed */
+		argv[0] = full;
+		argv[1] = NULL;
+
+		execve(full, argv, environ);
+		/* only reached on error */
 		perror("./hsh");
-		_exit(EXIT_FAILURE);
+		_exit(127);
 	}
 
 	/* parent */
-	waitpid(pid, &status, 0);
-
-	if (full != command)
-		free(full);
+	wait(&status);
+	free(full);
 }
 

@@ -1,85 +1,91 @@
 #include "shell.h"
 
-/* get value of PATH from envp (no getenv so it’s easy to test) */
+/* get value of an env var without getenv (to match project style) */
 static char *get_env(char **envp, const char *name)
 {
 	size_t nlen = strlen(name);
 
 	if (!envp)
-		return NULL;
+		return (NULL);
 
 	for (; *envp; envp++)
 	{
 		if (strncmp(*envp, name, nlen) == 0 && (*envp)[nlen] == '=')
-			return *envp + nlen + 1; /* pointer to value */
+			return (*envp + nlen + 1);
 	}
-	return NULL;
+	return (NULL);
 }
 
 /* Join dir + "/" + cmd into a malloc'ed string */
 static char *join3(const char *a, const char *b, const char *c)
 {
-	size_t la = strlen(a), lb = strlen(b), lc = strlen(c);
-	char *s = malloc(la + lb + lc + 1);
+	size_t la, lb, lc;
+	char *s;
 
-	if (!s) return NULL;
+	la = strlen(a);
+	lb = strlen(b);
+	lc = strlen(c);
+
+	s = malloc(la + lb + lc + 1);
+	if (!s)
+		return (NULL);
+
 	memcpy(s, a, la);
 	memcpy(s + la, b, lb);
 	memcpy(s + la + lb, c, lc);
 	s[la + lb + lc] = '\0';
-	return s;
+	return (s);
 }
 
-/*
- * resolve_path - if cmd has '/', return strdup(cmd) (no search)
- *                else search PATH for an executable.
- * Return: malloc'ed absolute path or NULL if not found.
- * NOTE: If PATH is NULL or an empty string, we MUST return NULL without forking.
+/**
+ * resolve_path - if cmd has '/', return strdup(cmd)
+ *                else search PATH for an executable
+ * Return: malloc'ed path or NULL if not found
  */
 char *resolve_path(const char *cmd, char **envp)
 {
 	struct stat st;
-	char *path, *copy, *tok;
+	char *path, *copy, *tok, *full;
 
 	if (!cmd || *cmd == '\0')
-		return NULL;
+		return (NULL);
 
-	/* Absolute/relative path given */
+	/* check if command includes '/' */
 	if (strchr(cmd, '/'))
 	{
 		if (stat(cmd, &st) == 0 && (st.st_mode & S_IXUSR))
-			return strdup(cmd);
-		return NULL;
+			return (strdup(cmd));
+		return (NULL);
 	}
 
-	/* PATH lookup */
 	path = get_env(envp, "PATH");
-	if (!path || *path == '\0') /* <== empty PATH: do not fork later */
-		return NULL;
+	if (!path || *path == '\0')
+		return (NULL);
 
 	copy = strdup(path);
 	if (!copy)
-		return NULL;
+		return (NULL);
 
-	for (tok = strtok(copy, ":"); tok; tok = strtok(NULL, ":"))
+	tok = strtok(copy, ":");
+	while (tok)
 	{
-		/* Empty entry means current directory "." */
 		if (*tok == '\0')
 			tok = ".";
 
-		char *full = join3(tok, "/", cmd);
+		full = join3(tok, "/", cmd);
 		if (!full)
 			break;
 
 		if (stat(full, &st) == 0 && (st.st_mode & S_IXUSR))
 		{
 			free(copy);
-			return full; /* found */
+			return (full);
 		}
 		free(full);
+		tok = strtok(NULL, ":");
 	}
 
 	free(copy);
-	return NULL;
+	return (NULL);
 }
 

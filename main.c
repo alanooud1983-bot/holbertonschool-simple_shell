@@ -1,40 +1,52 @@
 #include "shell.h"
 
-/**
- * main - entry point of a very small shell
- * @ac: argc (unused)
- * @av: argv (unused)
- * @envp: environment passed from kernel
- * Return: 0 on success
- */
-int main(int ac, char **av, char **envp)
+extern char **environ;
+
+static void rstrip_newline(char *s)
 {
-    char *line = NULL;
-    size_t n = 0;
-    ssize_t r;
+	size_t n;
+	if (!s) return;
+	n = strlen(s);
+	if (n && s[n - 1] == '\n') s[n - 1] = '\0';
+}
 
-    (void)ac;
-    (void)av;
+static int is_blank(const char *s)
+{
+	while (*s)
+	{
+		if (*s != ' ' && *s != '\t')
+			return 0;
+		s++;
+	}
+	return 1;
+}
 
-    while (1)
-    {
-        if (isatty(STDIN_FILENO))
-            write(STDOUT_FILENO, "$ ", 2);
+int main(void)
+{
+	char *line = NULL;
+	size_t cap = 0;
+	ssize_t nread;
 
-        r = getline(&line, &n, stdin);
-        if (r == -1) /* EOF (Ctrl+D) or read error */
-            break;
+	while (1)
+	{
+		if (isatty(STDIN_FILENO))
+			write(STDOUT_FILENO, "$ ", 2);
 
-        if (r > 0 && line[r - 1] == '\n')
-            line[r - 1] = '\0'; /* strip newline */
+		nread = getline(&line, &cap, stdin);
+		if (nread == -1)   /* Ctrl-D */
+			break;
 
-        if (*line == '\0')
-            continue; /* empty line: prompt again */
+		rstrip_newline(line);
+		if (*line == '\0' || is_blank(line))
+			continue;
 
-        execute_command(line, envp);
-    }
+		/* Task 4 expects one-word commands, no args */
+		if (strcmp(line, "exit") == 0) /* harmless for task 4; needed in task 5 */
+			break;
 
-    free(line);
-    return 0;
+		execute_command(line, environ);
+	}
+	free(line);
+	return 0;
 }
 
