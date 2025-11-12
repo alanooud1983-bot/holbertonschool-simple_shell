@@ -1,52 +1,21 @@
 #include "shell.h"
 
-extern char **environ;
-
-static void rstrip_newline(char *s)
-{
-	size_t n;
-	if (!s) return;
-	n = strlen(s);
-	if (n && s[n - 1] == '\n') s[n - 1] = '\0';
-}
-
-static int is_blank(const char *s)
-{
-	while (*s)
-	{
-		if (*s != ' ' && *s != '\t')
-			return 0;
-		s++;
-	}
-	return 1;
-}
-
 int main(void)
 {
-	char *line = NULL;
-	size_t cap = 0;
+	char command[MAX_COMMAND_LENGTH];
 	ssize_t nread;
 
 	while (1)
 	{
-		if (isatty(STDIN_FILENO))
-			write(STDOUT_FILENO, "$ ", 2);
+		write(STDOUT_FILENO, ":) ", 3);
 
-		nread = getline(&line, &cap, stdin);
-		if (nread == -1)   /* Ctrl-D */
-			break;
+		nread = read(STDIN_FILENO, command, sizeof(command) - 1);
+		if (nread <= 0) { write(STDOUT_FILENO, "\n", 1); break; }
 
-		rstrip_newline(line);
-		if (*line == '\0' || is_blank(line))
-			continue;
-
-		/* Task 4 expects one-word commands, no args */
-		if (strcmp(line, "exit") == 0) /* harmless for task 4; needed in task 5 */
-			break;
-
-		execute_command(line, environ);
+		command[nread - 1] = '\0';
+		if (strcmp(command, "exit") == 0) break;
+		if (command[0] != '\0') execute_command(command);
 	}
-	free(line);
-	return 0;
+	return (0);
 }
 
