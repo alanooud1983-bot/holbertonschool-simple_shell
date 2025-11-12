@@ -1,50 +1,53 @@
 #include "shell.h"
-#include <string.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
 
 /**
- * resolve_path - search PATH for an executable
- * @cmd: command name (no '/')
- * @envp: environment
- * Return: malloc'd absolute path if found, otherwise NULL
+ * resolve_command - Finds full path of a command using PATH
+ * @cmd: command name
+ * @out: buffer to store full path
+ * @out_sz: buffer size
+ *
+ * Return: 1 if found and executable, 0 if not
  */
-char *resolve_path(const char *cmd, char **envp)
+int resolve_command(const char *cmd, char *out, size_t out_sz)
 {
-	char *pathvar = NULL, *copy = NULL, *dir;
-	size_t len_cmd;
-	int i;
+    char *path, *copy, *dir;
 
-	if (!cmd || strchr(cmd, '/')) /* caller will handle absolute/relative */
-		return NULL;
+    if (!cmd || !*cmd)
+        return (0);
 
-	for (i = 0; envp && envp[i]; i++)
-		if (strncmp(envp[i], "PATH=", 5) == 0) { pathvar = envp[i] + 5; break; }
-	if (!pathvar)
-		return NULL;
+    /* Direct path */
+    if (strchr(cmd, '/'))
+    {
+        if (access(cmd, X_OK) == 0)
+        {
+            snprintf(out, out_sz, "%s", cmd);
+            return (1);
+        }
+        return (0);
+    }
 
-	copy = strdup(pathvar);
-	if (!copy)
-		return NULL;
+    /* Search PATH */
+    path = getenv("PATH");
+    if (!path)
+        return (0);
 
-	len_cmd = strlen(cmd);
+    copy = strdup(path);
+    if (!copy)
+        return (0);
 
-	for (dir = strtok(copy, ":"); dir; dir = strtok(NULL, ":"))
-	{
-		size_t len_dir = strlen(dir);
-		char *full = malloc(len_dir + 1 + len_cmd + 1);
+    for (dir = strtok(copy, ":"); dir; dir = strtok(NULL, ":"))
+    {
+        if (snprintf(out, out_sz, "%s/%s", dir, cmd) >= (int)out_sz)
+            continue;
 
-		if (!full) { free(copy); return NULL; }
+        if (access(out, X_OK) == 0)
+        {
+            free(copy);
+            return (1);
+        }
+    }
 
-		memcpy(full, dir, len_dir);
-		full[len_dir] = '/';
-		memcpy(full + len_dir + 1, cmd, len_cmd + 1);
-
-		if (access(full, X_OK) == 0) { free(copy); return full; }
-
-		free(full);
-	}
-	free(copy);
-	return NULL;
+    free(copy);
+    return (0);
 }
+

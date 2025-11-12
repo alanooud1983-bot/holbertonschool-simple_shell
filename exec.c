@@ -1,14 +1,10 @@
-/* exec.c - run a single command for Task 4 (PATH + no fork on missing cmd) */
 #include "shell.h"
 
 /**
- * execute_command - resolve a command and run it as a child
- * @command: command name (one word for this task)
+ * execute_command - Executes a command if found in PATH or directly
+ * @command: command to execute (one word, no args)
  *
- * Behavior (Task 4):
- * - If the command cannot be found (even after searching PATH),
- *   print "<cmd>: not found" and *do not fork*.
- * - If it is found, fork/exec and wait for the child to finish.
+ * Task 4: Handle PATH and do not fork if command doesn’t exist
  */
 void execute_command(char *command)
 {
@@ -20,7 +16,7 @@ void execute_command(char *command)
 	if (!command || !*command)
 		return;
 
-	/* Do not fork if not resolvable */
+	/* Find command: check PATH or direct access */
 	if (!resolve_command(command, full, sizeof(full)))
 	{
 		fprintf(stderr, "%s: not found\n", command);
@@ -38,13 +34,11 @@ void execute_command(char *command)
 	{
 		argv[0] = full;
 		argv[1] = NULL;
-		/* use the current environment */
 		execve(argv[0], argv, environ);
 		perror("./hsh");
 		_exit(EXIT_FAILURE);
 	}
-
-	/* parent waits for child */
-	waitpid(pid, &status, 0);
+	else
+		waitpid(pid, &status, 0);
 }
 
