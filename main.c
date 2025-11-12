@@ -30,6 +30,8 @@ int main(int ac, char **av, char **envp)
 
         if (*line == '\0')
             continue; /* empty line: prompt again */
+	if (strcmp(line, "exit") == 0)
+	 break;
 
         execute_command(line, envp);
     }
