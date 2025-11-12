@@ -35,10 +35,11 @@ A tiny UNIX command-line interpreter in C.
 
 The Authors 👩‍💻 :
 Nawal Alharbi — @nawalsamer04
+
 Alanoud Alanazi — @alanooud1983
 
 
-At the end ...
+# At the end ...
 “The best way to understand a system… is to build it.”
 
 Developed with ❤️ and a lot of debugging caffeine ☕ as part of Holberton School’s Simple Shell project.
