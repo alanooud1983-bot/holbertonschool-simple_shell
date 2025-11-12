@@ -1,74 +1,85 @@
 #include "shell.h"
 
-/* find PATH=... in envp without using getenv (forbidden) */
-static const char *find_path_var(char *const envp[])
+/* get value of PATH from envp (no getenv so it’s easy to test) */
+static char *get_env(char **envp, const char *name)
 {
-    int i;
+	size_t nlen = strlen(name);
 
-    if (!envp)
-        return NULL;
+	if (!envp)
+		return NULL;
 
-    for (i = 0; envp[i]; i++)
-    {
-        if (strncmp(envp[i], "PATH=", 5) == 0)
-            return envp[i] + 5;
-    }
-    return NULL;
+	for (; *envp; envp++)
+	{
+		if (strncmp(*envp, name, nlen) == 0 && (*envp)[nlen] == '=')
+			return *envp + nlen + 1; /* pointer to value */
+	}
+	return NULL;
 }
 
-/**
- * resolve_path - returns malloc'd absolute path to cmd if executable
- * @cmd: command name (no slash) or NULL
- * @envp: environment
- * Return: malloc'd full path (caller frees) or NULL if not found
- */
-char *resolve_path(const char *cmd, char *const envp[])
+/* Join dir + "/" + cmd into a malloc'ed string */
+static char *join3(const char *a, const char *b, const char *c)
 {
-    const char *pathvar;
-    char *paths, *dir, *full;
-    size_t need;
+	size_t la = strlen(a), lb = strlen(b), lc = strlen(c);
+	char *s = malloc(la + lb + lc + 1);
 
-    if (!cmd || !*cmd)
-        return NULL;
+	if (!s) return NULL;
+	memcpy(s, a, la);
+	memcpy(s + la, b, lb);
+	memcpy(s + la + lb, c, lc);
+	s[la + lb + lc] = '\0';
+	return s;
+}
 
-    /* if cmd already has a slash, check it directly */
-    if (strchr(cmd, '/'))
-        return (access(cmd, X_OK) == 0) ? strdup(cmd) : NULL;
+/*
+ * resolve_path - if cmd has '/', return strdup(cmd) (no search)
+ *                else search PATH for an executable.
+ * Return: malloc'ed absolute path or NULL if not found.
+ * NOTE: If PATH is NULL or an empty string, we MUST return NULL without forking.
+ */
+char *resolve_path(const char *cmd, char **envp)
+{
+	struct stat st;
+	char *path, *copy, *tok;
 
-    pathvar = find_path_var(envp);
-    if (!pathvar || !*pathvar)
-        return NULL;
+	if (!cmd || *cmd == '\0')
+		return NULL;
 
-    paths = strdup(pathvar);
-    if (!paths)
-        return NULL;
+	/* Absolute/relative path given */
+	if (strchr(cmd, '/'))
+	{
+		if (stat(cmd, &st) == 0 && (st.st_mode & S_IXUSR))
+			return strdup(cmd);
+		return NULL;
+	}
 
-    dir = strtok(paths, ":");
-    while (dir)
-    {
-        need = strlen(dir) + 1 + strlen(cmd) + 1; /* dir + '/' + cmd + '\0' */
-        full = malloc(need);
-        if (!full)
-        {
-            free(paths);
-            return NULL;
-        }
+	/* PATH lookup */
+	path = get_env(envp, "PATH");
+	if (!path || *path == '\0') /* <== empty PATH: do not fork later */
+		return NULL;
 
-        strcpy(full, dir);
-        strcat(full, "/");
-        strcat(full, cmd);
+	copy = strdup(path);
+	if (!copy)
+		return NULL;
 
-        if (access(full, X_OK) == 0)
-        {
-            free(paths);
-            return full; /* caller frees */
-        }
+	for (tok = strtok(copy, ":"); tok; tok = strtok(NULL, ":"))
+	{
+		/* Empty entry means current directory "." */
+		if (*tok == '\0')
+			tok = ".";
 
-        free(full);
-        dir = strtok(NULL, ":");
-    }
+		char *full = join3(tok, "/", cmd);
+		if (!full)
+			break;
 
-    free(paths);
-    return NULL;
+		if (stat(full, &st) == 0 && (st.st_mode & S_IXUSR))
+		{
+			free(copy);
+			return full; /* found */
+		}
+		free(full);
+	}
+
+	free(copy);
+	return NULL;
 }
 

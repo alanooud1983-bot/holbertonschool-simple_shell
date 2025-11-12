@@ -1,65 +1,51 @@
 #include "shell.h"
 
-/**
- * execute_command - parses a line and runs the command
- * @input: whole line typed by the user
- * @envp: environment
+/*
+ * execute_command - run a single command (no arguments).
+ * Requirement for task 4:
+ *   - If command cannot be resolved, print error and DO NOT fork.
  */
-void execute_command(char *input, char *const envp[])
+void execute_command(char *command, char **envp)
 {
-    char *argv[MAX_ARGS];
-    int argc = 0;
-    char *tok, *path = NULL;
-    pid_t pid;
-    int status;
+	pid_t pid;
+	int status;
+	char *full = NULL;
 
-    /* tokenize by spaces/tabs */
-    tok = strtok(input, " \t");
-    while (tok && argc < MAX_ARGS - 1)
-    {
-        argv[argc++] = tok;
-        tok = strtok(NULL, " \t");
-    }
-    argv[argc] = NULL;
+	if (!command || *command == '\0')
+		return;
 
-    if (argc == 0)
-        return;
+	/* Resolve BEFORE forking */
+	full = resolve_path(command, envp);
 
-    /* built-in: exit */
-    if (strcmp(argv[0], "exit") == 0)
-        exit(0);
+	if (!full)
+	{
+		/* Not found: no fork */
+		dprintf(STDERR_FILENO, "%s: not found\n", command);
+		return;
+	}
 
-    /* find executable: absolute/relative or via PATH */
-    if (strchr(argv[0], '/'))
-        path = strdup(argv[0]);
-    else
-        path = resolve_path(argv[0], (char *const *)envp);
+	pid = fork();
+	if (pid == -1)
+	{
+		perror("fork");
+		free(full != command ? full : NULL);
+		return;
+	}
 
-    if (!path)
-    {
-        /* Requirement: do NOT fork when command doesn't exist */
-        dprintf(STDERR_FILENO, "%s: not found\n", argv[0]);
-        return;
-    }
+	if (pid == 0)
+	{
+		/* child */
+		char *argv[] = { command, NULL };
+		execve(full, argv, envp);
+		/* execve failed */
+		perror("./hsh");
+		_exit(EXIT_FAILURE);
+	}
 
-    pid = fork();
-    if (pid == -1)
-    {
-        perror("fork");
-        free(path);
-        return;
-    }
-    if (pid == 0)
-    {
-        execve(path, argv, (char *const *)envp);
-        perror("execve"); /* only if execve fails */
-        _exit(127);
-    }
-    else
-    {
-        waitpid(pid, &status, 0);
-    }
+	/* parent */
+	waitpid(pid, &status, 0);
 
-    free(path);
+	if (full != command)
+		free(full);
 }
 
