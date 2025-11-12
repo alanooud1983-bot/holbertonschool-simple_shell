@@ -26,7 +26,9 @@ A tiny UNIX command-line interpreter in C.
 ```bash
 gcc -Wall -Werror -Wextra -pedantic -std=gnu89 *.c -o hsh
 
-In conclusion : 
+
+
+## In conclusion : 
 What Did we  Learn?
 
 1. How to create and manage processes with fork and execve
