@@ -1,57 +1,44 @@
 #include "shell.h"
 
-/**
- * main - tiny shell loop (tasks 4–6)
- * Return: 0
- */
-int main(void)
+int tokenize(char *line, char **argv, int max_tokens)
 {
-	char command[MAX_COMMAND_LENGTH];
-	ssize_t nread;
+    int n = 0;
+    char *tok = strtok(line, " \t\r\n");
 
-	while (1)
-	{
-		char *p;
-		char *end;
+    while (tok && n < max_tokens - 1)
+    {
+        argv[n++] = tok;
+        tok = strtok(NULL, " \t\r\n");
+    }
+    argv[n] = NULL;
+    return n;
+}
 
-		/* prompt only for interactive stdin */
-		if (isatty(STDIN_FILENO))
-			write(STDOUT_FILENO, ":) ", 3);
+int main(int ac, char **av, char **envp)
+{
+    char line[MAX_COMMAND_LENGTH];
+    ssize_t nread;
+    char *argv[MAX_TOKENS];
 
-		nread = read(STDIN_FILENO, command, MAX_COMMAND_LENGTH - 1);
-		if (nread == -1)
-			continue;
+    (void)ac; (void)av;
 
-		/* EOF */
-		if (nread == 0)
-		{
-			if (isatty(STDIN_FILENO))
-				write(STDOUT_FILENO, "\n", 1);
-			break;
-		}
+    while (1)
+    {
+        write(STDOUT_FILENO, "$ ", 2);
 
-		command[nread] = '\0';
+        nread = read(STDIN_FILENO, line, sizeof(line) - 1);
+        if (nread <= 0) { write(STDOUT_FILENO, "\n", 1); break; }
 
-		/* trim leading / trailing spaces and newline */
-		p = command;
-		while (*p == ' ' || *p == '\t')
-			p++;
+        line[nread] = '\0';
 
-		end = p + strlen(p);
-		while (end > p &&
-		       (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\n'))
-			end--;
-		*end = '\0';
+        if (tokenize(line, argv, MAX_TOKENS) == 0)
+            continue;
 
-		if (*p == '\0')
-			continue;
+        if (strcmp(argv[0], "exit") == 0)
+            break;
 
-		/* task 5: built-in exit (no args) */
-		if (strcmp(p, "exit") == 0)
-			break;
-
-		execute_command(p);
-	}
-	return (0);
+        execute_command(argv, envp);
+    }
+    return 0;
 }
 

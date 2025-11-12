@@ -1,27 +1,24 @@
 #ifndef SHELL_H
 #define SHELL_H
 
-#include <stddef.h>     /* size_t, NULL */
-#include <stdio.h>      /* perror */
-#include <stdlib.h>     /* malloc, free, exit */
-#include <string.h>     /* strlen, strcmp, strtok */
-#include <unistd.h>     /* read, write, access, fork, execve, isatty */
-#include <sys/types.h>  /* pid_t */
-#include <sys/wait.h>   /* wait */
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
 
 #define MAX_COMMAND_LENGTH 1024
-
-extern char **environ;
+#define MAX_TOKENS 64
 
 /* core */
-void execute_command(char *command);
+int   tokenize(char *line, char **argv, int max_tokens);
+char *get_env_from_envp(const char *name, char **envp);
+char *resolve_path(const char *cmd, char **envp); /* malloc'd; NULL if not found */
+void  execute_command(char **argv, char **envp);  /* does nothing if argv[0] unfound */
 
-/* PATH handling */
-char *resolve_path(const char *cmd, char **envp);
-
-/* small utils */
-char *strdup2(const char *s);
-char *join3(const char *a, const char *b, const char *c);
-
-#endif /* SHELL_H */
+#endif
 

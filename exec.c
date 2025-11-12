@@ -1,45 +1,37 @@
 #include "shell.h"
 
-/**
- * execute_command - resolve and run a command
- * @command: command string (no args for task 4)
- */
-void execute_command(char *command)
+/* Fork only when we HAVE a valid absolute/relative executable path */
+void execute_command(char **argv, char **envp)
 {
-	pid_t pid;
-	int status;
-	char *full;
-	char *argv[2];
+    pid_t pid;
+    int status;
+    char *full;
 
-	/* Do not fork if command cannot be resolved (task 4 rule) */
-	full = resolve_path(command, environ);
-	if (!full)
-	{
-		write(STDOUT_FILENO, command, strlen(command));
-		write(STDOUT_FILENO, ": not found\n", 12);
-		return;
-	}
+    if (!argv || !argv[0] || argv[0][0] == '\0')
+        return;
 
-	pid = fork();
-	if (pid == -1)
-	{
-		perror("fork");
-		free(full);
-		return;
-	}
-	if (pid == 0)
-	{
-		argv[0] = full;
-		argv[1] = NULL;
-		/* pass environ as required */
-		if (execve(full, argv, environ) == -1)
-			perror("./hsh");
-		exit(EXIT_FAILURE);
-	}
-	else
-	{
-		wait(&status);
-		free(full);
-	}
+    full = resolve_path(argv[0], envp);
+    if (!full)
+    {
+        write(STDERR_FILENO, argv[0], strlen(argv[0]));
+        write(STDERR_FILENO, ": not found\n", 12);
+        return; /* IMPORTANT: do NOT fork on missing command */
+    }
+
+    pid = fork();
+    if (pid == -1)
+    {
+        perror("fork");
+        free(full);
+        return;
+    }
+    if (pid == 0)
+    {
+        execve(full, argv, envp);
+        perror(argv[0]);
+        _exit(127);
+    }
+    free(full);
+    wait(&status);
 }
 
