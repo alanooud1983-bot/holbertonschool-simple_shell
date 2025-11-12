@@ -1,37 +1,24 @@
 #include "shell.h"
 
-/* Fork only when we HAVE a valid absolute/relative executable path */
-void execute_command(char **argv, char **envp)
+void execute_command(char *command)
 {
     pid_t pid;
-    int status;
-    char *full;
+    char *argv[2];
+    char *path;
 
-    if (!argv || !argv[0] || argv[0][0] == '\0')
-        return;
+    argv[0] = command;
+    argv[1] = NULL;
 
-    full = resolve_path(argv[0], envp);
-    if (!full)
-    {
-        write(STDERR_FILENO, argv[0], strlen(argv[0]));
-        write(STDERR_FILENO, ": not found\n", 12);
-        return; /* IMPORTANT: do NOT fork on missing command */
-    }
+    path = resolve_path(command);
 
     pid = fork();
-    if (pid == -1)
-    {
-        perror("fork");
-        free(full);
-        return;
-    }
     if (pid == 0)
     {
-        execve(full, argv, envp);
-        perror(argv[0]);
-        _exit(127);
+        if (execve(path, argv, environ) == -1)
+            perror("Error");
+        exit(1);
     }
-    free(full);
-    wait(&status);
+    else if (pid > 0)
+        wait(NULL);
 }
 

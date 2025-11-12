@@ -1,0 +1,10 @@
+#include "shell.h"
+
+int main(void)
+{
+	char command[MAX_COMMAND_LENGTH];
+	ssize_t nread;
+
+	while (1)
+	{
+		write(STDOUT_FILENO, ":) ", 3);
