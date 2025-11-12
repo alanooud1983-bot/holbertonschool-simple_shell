@@ -16,29 +16,37 @@ int main(int ac, char **av, char **envp)
     (void)ac;
     (void)av;
 
-	while (1)
+while (1)
 {
+    /* prompt only when interactive */
+    if (isatty(STDIN_FILENO))
+        write(STDOUT_FILENO, "$ ", 2);
+
     r = getline(&line, &n, stdin);
-    if (r == -1) /* EOF (Ctrl+D) or read error */
+    if (r == -1)          /* EOF (Ctrl+D) or read error */
         break;
 
     if (r > 0 && line[r - 1] == '\n')
-        line[r - 1] = '\0'; /* strip newline */
+        line[r - 1] = '\0';  /* strip newline */
 
-    if (*line == '\0')
-        continue; /* empty line: prompt again */
+    /* skip empty or whitespace-only lines */
+    {
+        size_t i = 0;
+        while (line[i] == ' ' || line[i] == '\t')
+            i++;
+        if (line[i] == '\0')
+            continue;
+        if (i) memmove(line, line + i, strlen(line + i) + 1);
+    }
 
-    /* === Task 5: exit built-in === */
+    /* Task 5: built-in exit (no args) */
     if (strcmp(line, "exit") == 0)
         break;
-    /* ============================ */
 
     execute_command(line, envp);
-
-    /* print prompt only after command succeeds */
-    if (isatty(STDIN_FILENO))
-        write(STDOUT_FILENO, "$ ", 2);
+    /* loop will re-print prompt at top if interactive */
 }
+
 
 
     free(line);
