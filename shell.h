@@ -13,8 +13,7 @@
 
 #define MAX_ARGS 64
 
-void execute_command(char *input, char *const envp[]);
+void execute_command(char *input, char *const envp[], char *prog_name, int line_num);
 char *resolve_path(const char *cmd, char *const envp[]);
 
 #endif /* SHELL_H */
-

@@ -3,7 +3,7 @@
 /**
  * main - Entry point of the simple shell
  * @ac: argument count (unused)
- * @av: argument vector (unused)
+ * @av: argument vector
  * @envp: environment variables
  * Return: 0 on success
  */
@@ -12,9 +12,9 @@ int main(int ac, char **av, char **envp)
 	char *line = NULL;
 	size_t n = 0;
 	ssize_t r = 0;
+	int line_number = 0;
 
 	(void)ac;
-	(void)av;
 
 	while (1)
 	{
@@ -31,10 +31,10 @@ int main(int ac, char **av, char **envp)
 		if (line[0] == '\0')
 			continue;
 
-		execute_command(line, envp);
+		line_number++;
+		execute_command(line, envp, av[0], line_number);
 	}
 
 	free(line);
 	return (0);
 }
-
