@@ -1,114 +1,74 @@
 #include "shell.h"
 
-/**
- * get_path_value - find "PATH=" in envp without using getenv
- * @envp: environment
- * Return: pointer to PATH value (after "PATH=") or NULL
- */
-static char *get_path_value(char * const envp[])
+/* find PATH=... in envp without using getenv (forbidden) */
+static const char *find_path_var(char *const envp[])
 {
-	int i;
-	size_t len = 5; /* strlen("PATH=") */
+    int i;
 
-	if (!envp)
-		return (NULL);
+    if (!envp)
+        return NULL;
 
-	for (i = 0; envp[i]; i++)
-	{
-		if (strncmp(envp[i], "PATH=", len) == 0)
-			return (envp[i] + len);
-	}
-	return (NULL);
+    for (i = 0; envp[i]; i++)
+    {
+        if (strncmp(envp[i], "PATH=", 5) == 0)
+            return envp[i] + 5;
+    }
+    return NULL;
 }
 
 /**
- * dup_string - simple strdup replacement using allowed functions
- * @s: string to duplicate
- * Return: malloc'd copy or NULL
- */
-static char *dup_string(const char *s)
-{
-	size_t len;
-	char *copy;
-
-	if (!s)
-		return (NULL);
-
-	len = strlen(s);
-	copy = malloc(len + 1);
-	if (!copy)
-		return (NULL);
-
-	memcpy(copy, s, len + 1);
-	return (copy);
-}
-
-/**
- * resolve_path - build an absolute path using PATH and check executability
- * @cmd: command name (no slash)
+ * resolve_path - returns malloc'd absolute path to cmd if executable
+ * @cmd: command name (no slash) or NULL
  * @envp: environment
- *
  * Return: malloc'd full path (caller frees) or NULL if not found
  */
-char *resolve_path(const char *cmd, char * const envp[])
+char *resolve_path(const char *cmd, char *const envp[])
 {
-	char *path_env, *path_copy, *dir;
-	size_t cmd_len, dir_len;
-	char *full;
-	size_t need;
+    const char *pathvar;
+    char *paths, *dir, *full;
+    size_t need;
 
-	if (!cmd || !*cmd)
-		return (NULL);
+    if (!cmd || !*cmd)
+        return NULL;
 
-	/* if cmd already has a slash, caller should have handled it,
-	 * but be safe anyway
-	 */
-	if (strchr(cmd, '/'))
-	{
-		if (access(cmd, X_OK) == 0)
-			return (dup_string(cmd));
-		return (NULL);
-	}
+    /* if cmd already has a slash, check it directly */
+    if (strchr(cmd, '/'))
+        return (access(cmd, X_OK) == 0) ? strdup(cmd) : NULL;
 
-	path_env = get_path_value(envp);
-	if (!path_env || !*path_env)
-		return (NULL);
+    pathvar = find_path_var(envp);
+    if (!pathvar || !*pathvar)
+        return NULL;
 
-	path_copy = dup_string(path_env);
-	if (!path_copy)
-		return (NULL);
+    paths = strdup(pathvar);
+    if (!paths)
+        return NULL;
 
-	cmd_len = strlen(cmd);
-	dir = strtok(path_copy, ":");
+    dir = strtok(paths, ":");
+    while (dir)
+    {
+        need = strlen(dir) + 1 + strlen(cmd) + 1; /* dir + '/' + cmd + '\0' */
+        full = malloc(need);
+        if (!full)
+        {
+            free(paths);
+            return NULL;
+        }
 
-	while (dir)
-	{
-		dir_len = strlen(dir);
-		need = dir_len + 1 + cmd_len + 1; /* dir + '/' + cmd + '\0' */
+        strcpy(full, dir);
+        strcat(full, "/");
+        strcat(full, cmd);
 
-		full = malloc(need);
-		if (!full)
-		{
-			free(path_copy);
-			return (NULL);
-		}
+        if (access(full, X_OK) == 0)
+        {
+            free(paths);
+            return full; /* caller frees */
+        }
 
-		memcpy(full, dir, dir_len);
-		full[dir_len] = '/';
-		memcpy(full + dir_len + 1, cmd, cmd_len);
-		full[need - 1] = '\0';
+        free(full);
+        dir = strtok(NULL, ":");
+    }
 
-		if (access(full, X_OK) == 0)
-		{
-			free(path_copy);
-			return (full); /* caller frees */
-		}
-
-		free(full);
-		dir = strtok(NULL, ":");
-	}
-
-	free(path_copy);
-	return (NULL);
+    free(paths);
+    return NULL;
 }
 
