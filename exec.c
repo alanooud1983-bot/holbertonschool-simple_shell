@@ -1,65 +1,71 @@
 #include "shell.h"
 
 /**
- * execute_command - parses a line and runs the command
- * @input: whole line typed by the user
+ * execute_command - parse a line and run the command
+ * @input: full line from the user (will be modified)
  * @envp: environment
  */
-void execute_command(char *input, char *const envp[])
+void execute_command(char *input, char **envp)
 {
-    char *argv[MAX_ARGS];
-    int argc = 0;
-    char *tok, *path = NULL;
-    pid_t pid;
-    int status;
+	char *argv[MAX_ARGS];
+	int argc = 0;
+	char *tok, *path = NULL;
+	pid_t pid;
+	int status;
 
-    /* tokenize by spaces/tabs */
-    tok = strtok(input, " \t");
-    while (tok && argc < MAX_ARGS - 1)
-    {
-        argv[argc++] = tok;
-        tok = strtok(NULL, " \t");
-    }
-    argv[argc] = NULL;
+	/* split on spaces/tabs */
+	tok = strtok(input, " \t");
+	while (tok && argc < MAX_ARGS - 1)
+	{
+		argv[argc++] = tok;
+		tok = strtok(NULL, " \t");
+	}
+	argv[argc] = NULL;
 
-    if (argc == 0)
-        return;
+	if (argc == 0)
+		return;
 
-    /* built-in: exit */
-    if (strcmp(argv[0], "exit") == 0)
-        exit(0);
+	/* built-in: exit */
+	if (strcmp(argv[0], "exit") == 0)
+		exit(0);
 
-    /* find executable: absolute/relative or via PATH */
-    if (strchr(argv[0], '/'))
-        path = strdup(argv[0]);
-    else
-        path = resolve_path(argv[0], (char *const *)envp);
+	/* built-in: env */
+	if (strcmp(argv[0], "env") == 0)
+	{
+		print_env(envp);
+		return;
+	}
 
-    if (!path)
-    {
-        /* Requirement: do NOT fork when command doesn't exist */
-        dprintf(STDERR_FILENO, "%s: not found\n", argv[0]);
-        return;
-    }
+	/* find executable: absolute/relative or via PATH */
+	if (strchr(argv[0], '/'))
+		path = strdup(argv[0]);
+	else
+		path = resolve_path(argv[0], envp);
 
-    pid = fork();
-    if (pid == -1)
-    {
-        perror("fork");
-        free(path);
-        return;
-    }
-    if (pid == 0)
-    {
-        execve(path, argv, (char *const *)envp);
-        perror("execve"); /* only if execve fails */
-        _exit(127);
-    }
-    else
-    {
-        waitpid(pid, &status, 0);
-    }
+	if (!path)
+	{
+		dprintf(STDERR_FILENO, "%s: not found\n", argv[0]);
+		return;
+	}
 
-    free(path);
+	pid = fork();
+	if (pid == -1)
+	{
+		perror("fork");
+		free(path);
+		return;
+	}
+	if (pid == 0)
+	{
+		execve(path, argv, envp);
+		perror("execve"); /* only if execve fails */
+		_exit(127);
+	}
+	else
+	{
+		waitpid(pid, &status, 0);
+	}
+
+	free(path);
 }
 
