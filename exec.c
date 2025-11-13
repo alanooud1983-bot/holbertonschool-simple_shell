@@ -5,6 +5,8 @@
  * @input: full line from the user (will be modified)
  * @envp: environment
  */
+int last_status = 0;
+
 void execute_command(char *input, char **envp)
 {
 	char *argv[MAX_ARGS];
@@ -30,11 +32,12 @@ void execute_command(char *input, char **envp)
 		exit(0);
 
 	/* built-in: env */
-	if (strcmp(argv[0], "env") == 0)
+	/* built-in: exit */
+	if (strcmp(argv[0], "exit") == 0)
 	{
-		print_env(envp);
-		return;
+    		exit(last_status);
 	}
+
 
 	/* find executable: absolute/relative or via PATH */
 	if (strchr(argv[0], '/'))
@@ -63,9 +66,14 @@ void execute_command(char *input, char **envp)
 	}
 	else
 	{
-		waitpid(pid, &status, 0);
+    waitpid(pid, &status, 0);
+
+    if (WIFEXITED(status))
+        last_status = WEXITSTATUS(status);
+    else
+        last_status = 1; /* generic error */
 	}
 
 	free(path);
-}
+	}
 
